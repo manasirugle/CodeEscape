@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SYSTEM CHECKPOINT | CodeEscape</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+body{position:relative;font-family:'Share Tech Mono',monospace;}
+
+#main-canvas{position:fixed;inset:0;z-index:0;}
+#particle-canvas{position:fixed;inset:0;z-index:1;pointer-events:none;}
+
+/* ── LETTERBOX ── */
+.bar{
+  position:fixed;left:0;right:0;z-index:40;
+  background:#000;transition:height .6s cubic-bezier(.4,0,.2,1);
+}
+#bar-top{top:0;height:12%;}
+#bar-bot{bottom:0;height:12%;}
+.bar.open{height:0 !important;}
+
+/* ── SCANLINES ── */
+.scanlines{
+  position:fixed;inset:0;z-index:2;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.15) 2px,rgba(0,0,0,.15) 4px);
+}
+
+/* ── CINEMATIC SHAKE ── */
+#scene-wrap{
+  position:fixed;inset:0;z-index:3;
+}
+#scene-wrap.shaking{animation:camShake 6s ease-in-out infinite;}
+@keyframes camShake{
+  0%,100%{transform:translate(0,0) rotate(0);}
+  10%{transform:translate(-1px,.5px) rotate(-.08deg);}
+  20%{transform:translate(1px,-.5px) rotate(.06deg);}
+  30%{transform:translate(-.5px,1px) rotate(.1deg);}
+  50%{transform:translate(.5px,-.5px) rotate(-.05deg);}
+  70%{transform:translate(-1px,0) rotate(.08deg);}
+  90%{transform:translate(1px,.5px) rotate(-.06deg);}
+}
+
+/* ── DOOR SCENE ── */
+#door-scene{position:fixed;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;}
+#door-frame{
+  position:relative;width:min(360px,55vw);height:min(500px,72vh);
+  display:flex;align-items:stretch;
+  filter:drop-shadow(0 0 40px rgba(255,100,20,.3)) drop-shadow(0 0 80px rgba(0,60,180,.2));
+}
+/* Warm glow behind door */
+#door-glow{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 55%,
+    rgba(255,160,40,.95) 0%,rgba(255,90,15,.65) 35%,
+    rgba(200,50,0,.2) 65%,transparent 100%);
+  filter:blur(24px);opacity:0;z-index:0;transition:opacity .5s;
+}
+/* Frame borders */
+.frame-edge{position:absolute;background:linear-gradient(135deg,#1c2e42,#0d1c2e,#1a2840);z-index:5;}
+#fe-top{top:0;left:0;right:0;height:8px;}
+#fe-bot{bottom:0;left:0;right:0;height:8px;}
+#fe-l{top:0;left:0;bottom:0;width:8px;}
+#fe-r{top:0;right:0;bottom:0;width:8px;}
+/* Door halves */
+.door-half{
+  flex:1;position:relative;z-index:2;overflow:hidden;
+  background:linear-gradient(180deg,#151f30 0%,#0c141f 25%,#101a28 50%,#08111a 80%,#070e18 100%);
+  border:1px solid rgba(40,70,110,.5);
+  box-shadow:inset 0 0 40px rgba(0,0,0,.6);
+  transition:transform 2s cubic-bezier(.25,.46,.45,.94);
+}
+/* Metal panel texture */
+.door-half::before{content:'';position:absolute;inset:12px;border:1px solid rgba(35,65,105,.35);}
+/* Vertical accent strip */
+.door-half::after{
+  content:'';position:absolute;top:15%;bottom:15%;width:3px;
+  background:linear-gradient(180deg,transparent,rgba(0,120,200,.2),rgba(0,180,255,.35),rgba(0,120,200,.2),transparent);
+}
+#door-half-l::after{right:18px;}
+#door-half-r::after{left:18px;}
+/* Ridge lines */
+.ridge{position:absolute;left:18px;right:18px;height:1px;background:rgba(35,65,105,.3);}
+/* Bolt dots */
+.bolt{position:absolute;width:6px;height:6px;border-radius:50%;background:#1a2e42;box-shadow:inset 0 1px rgba(60,100,160,.3);}
+#door-half-l.open{transform:translateX(-102%);}
+#door-half-r.open{transform:translateX(102%);}
+/* Lock center piece */
+#lock-center{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  transition:opacity .4s;
+}
+.lc-ring{width:28px;height:28px;border-radius:50%;border:2px solid rgba(0,245,255,.4);display:flex;align-items:center;justify-content:center;}
+.lc-dot{width:10px;height:10px;border-radius:50%;background:#00ff88;box-shadow:0 0 10px #00ff88;animation:ldPulse 1.1s ease-in-out infinite;}
+@keyframes ldPulse{0%,100%{transform:scale(1);}50%{transform:scale(.7);opacity:.5;}}
+.lc-txt{font-size:.42rem;letter-spacing:.2em;color:#00ff88;text-transform:uppercase;}
+
+/* ── CORRIDOR ── */
+#corridor-scene{
+  position:fixed;inset:0;z-index:5;opacity:0;transition:opacity .8s;
+  display:flex;align-items:center;justify-content:center;
+  animation:none;
+}
+#corridor-scene.show{opacity:1;}
+/* Camera dolly — perspective zoom using scale */
+#corridor-inner{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  transform-origin:50% 52%;
+}
+#corridor-inner.dolly{
+  animation:dollyIn 3s ease-in-out forwards;
+}
+@keyframes dollyIn{
+  0%{transform:scale(1);}
+  100%{transform:scale(1.22) translateY(-1%);}
+}
+/* Depth of field blur on edges */
+#dof-vignette{
+  position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 140px rgba(0,0,0,.75);
+  background:radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(0,0,0,.55) 100%);
+}
+/* Walls drawn on canvas */
+#corr-canvas{position:absolute;inset:0;z-index:0;width:100%;height:100%;}
+/* Blue ambient glow overlay */
+#blue-glow{
+  position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:radial-gradient(ellipse at 50% 50%,rgba(0,100,255,.14) 0%,transparent 65%);
+  opacity:0;transition:opacity 1.5s;
+}
+#blue-glow.show{opacity:1;}
+/* Locker door at corridor end */
+#locker-wrap{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;
+  pointer-events:none;
+}
+#locker-door{
+  width:72px;height:108px;
+  background:linear-gradient(180deg,#090f1a,#060c14);
+  border:2px solid rgba(255,51,85,.35);
+  position:relative;overflow:hidden;
+  box-shadow:0 0 20px rgba(255,51,85,.2),inset 0 0 12px rgba(0,0,0,.7);
+}
+#locker-door::before{content:'';position:absolute;inset:5px;border:1px solid rgba(255,51,85,.18);}
+.ld-ridge{position:absolute;left:6px;right:6px;height:1px;background:rgba(255,51,85,.12);}
+#ld-badge{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.red-dot{width:8px;height:8px;border-radius:50%;background:#ff3355;box-shadow:0 0 10px #ff3355;animation:rblink .85s ease-in-out infinite;}
+@keyframes rblink{0%,100%{opacity:1;}50%{opacity:.2;}}
+.red-label{font-size:.3rem;letter-spacing:.15em;color:#ff3355;text-transform:uppercase;}
+#locker-label{
+  position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);
+  font-size:.32rem;letter-spacing:.16em;color:rgba(255,80,80,.4);white-space:nowrap;
+}
+/* Red warning tint at corridor end */
+#corr-red-glow{
+  position:absolute;bottom:35%;left:35%;right:35%;top:35%;
+  background:radial-gradient(ellipse,rgba(255,40,40,.15),transparent 75%);
+  filter:blur(10px);pointer-events:none;z-index:1;
+}
+
+/* ── HOLOGRAPHIC PANEL ── */
+#holo-scene{
+  position:fixed;inset:0;z-index:15;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;
+}
+#holo-scene.show{pointer-events:auto;animation:holoIn .55s ease-out forwards;}
+@keyframes holoIn{
+  0%{opacity:0;transform:scale(.94);}
+  35%{opacity:.2;}
+  55%{opacity:.95;}
+  65%{opacity:.45;}
+  78%{opacity:1;}
+  85%{opacity:.6;}
+  100%{opacity:1;}
+}
+#holo-card{
+  width:min(560px,92vw);
+  background:rgba(0,16,42,.5);
+  border:1px solid rgba(0,245,255,.38);
+  border-radius:3px;
+  backdrop-filter:blur(22px) saturate(1.6);
+  -webkit-backdrop-filter:blur(22px) saturate(1.6);
+  box-shadow:
+    0 0 50px rgba(0,100,255,.28),
+    0 0 100px rgba(0,200,255,.1),
+    inset 0 0 60px rgba(0,20,60,.35);
+  padding:30px 34px 28px;
+  position:relative;overflow:hidden;
+}
+/* Green border glow layer */
+#holo-card::before{
+  content:'';position:absolute;inset:0;
+  border:1px solid rgba(0,255,136,.28);border-radius:3px;
+  box-shadow:0 0 14px rgba(0,255,136,.18),inset 0 0 14px rgba(0,255,136,.05);
+  pointer-events:none;
+}
+/* Animated top gradient bar */
+#holo-card::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,#00f5ff,#00ff88,#00f5ff,transparent);
+  animation:topBar 3s ease-in-out infinite;
+}
+@keyframes topBar{0%,100%{opacity:.55;}50%{opacity:1;}}
+/* Sweep sheen */
+.h-sweep{
+  position:absolute;top:0;left:-100%;width:45%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(0,245,255,.055),transparent);
+  animation:sweep 5s ease-in-out infinite;pointer-events:none;
+}
+@keyframes sweep{0%{left:-100%;}100%{left:200%;}}
+/* Scan line */
+.h-scan{
+  position:absolute;left:0;right:0;height:2px;top:0;
+  background:linear-gradient(90deg,transparent,rgba(0,245,255,.45),transparent);
+  animation:scanLine 2.8s ease-in-out infinite;opacity:.55;pointer-events:none;
+}
+@keyframes scanLine{0%{top:0%;}100%{top:100%;}}
+
+/* Text styles */
+.h-net{font-size:.52rem;letter-spacing:.28em;color:#00ff88;margin-bottom:8px;text-transform:uppercase;}
+#h-title{
+  font-family:'Orbitron',sans-serif;font-size:clamp(.95rem,2.4vw,1.2rem);
+  font-weight:900;letter-spacing:.16em;color:#00f5ff;
+  text-shadow:0 0 18px #00f5ff,0 0 36px rgba(0,245,255,.4);
+  min-height:1.6em;margin-bottom:5px;
+}
+#h-sub{font-size:.68rem;letter-spacing:.09em;color:rgba(170,215,255,.72);min-height:1.2em;margin-bottom:3px;}
+#h-reach{font-size:.68rem;letter-spacing:.09em;color:rgba(170,215,255,.65);min-height:1.2em;margin-bottom:16px;}
+.h-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,.22),transparent);margin-bottom:16px;}
+#h-declare{font-size:.7rem;letter-spacing:.09em;color:rgba(200,230,255,.82);min-height:1.2em;margin-bottom:10px;}
+#h-warn{
+  font-size:.64rem;letter-spacing:.09em;color:#ffaa00;
+  min-height:1.2em;margin-bottom:4px;
+  display:flex;align-items:center;gap:7px;
+}
+#h-store{font-size:.64rem;letter-spacing:.09em;color:rgba(255,170,80,.75);min-height:1.2em;margin-bottom:14px;}
+/* Proceed instruction */
+#h-proceed{
+  font-size:.68rem;letter-spacing:.1em;
+  color:rgba(0,245,255,.7);
+  border-left:2px solid rgba(0,245,255,.3);
+  padding-left:12px;line-height:1.7;
+  opacity:0;transition:opacity .7s;
+  min-height:1.2em;
+}
+#h-proceed.show{opacity:1;}
+/* Bottom status strip */
+#h-status{
+  margin-top:14px;padding-top:12px;
+  border-top:1px solid rgba(0,245,255,.1);
+  display:flex;align-items:center;gap:8px;
+  font-size:.52rem;letter-spacing:.18em;color:rgba(0,245,255,.45);
+}
+.h-sdot{width:6px;height:6px;border-radius:50%;background:#00f5ff;box-shadow:0 0 6px #00f5ff;animation:sdot 1.3s ease-in-out infinite;}
+@keyframes sdot{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+/* Blinking cursor */
+.tcursor{display:inline-block;width:7px;height:.88em;background:#00f5ff;vertical-align:text-bottom;margin-left:2px;animation:cur .7s step-end infinite;}
+@keyframes cur{0%,100%{opacity:1;}50%{opacity:0;}}
+
+/* ── OVERLAYS ── */
+#fade-in{position:fixed;inset:0;z-index:60;background:#000;animation:fi .9s ease-out .1s forwards;}
+@keyframes fi{from{opacity:1;}to{opacity:0;visibility:hidden;}}
+#fade-out{position:fixed;inset:0;z-index:60;background:#000;opacity:0;pointer-events:none;transition:opacity 1.1s;}
+#fade-out.show{opacity:1;}
+
+/* ── SKIP ── */
+#skip-btn{
+  position:fixed;bottom:calc(12% + 14px);right:22px;z-index:50;
+  font-size:.52rem;letter-spacing:.18em;color:rgba(100,155,205,.38);
+  background:transparent;border:1px solid rgba(100,155,205,.18);
+  padding:5px 13px;border-radius:2px;cursor:pointer;transition:all .3s;
+}
+#skip-btn:hover{color:rgba(0,245,255,.7);border-color:rgba(0,245,255,.3);}
+</style>
+</head>
+<body>
+
+<div id="fade-in"></div>
+<div id="fade-out"></div>
+<div class="bar" id="bar-top"></div>
+<div class="bar" id="bar-bot"></div>
+<div class="scanlines"></div>
+
+<!-- Scene wrapper (camera shake applied here) -->
+<div id="scene-wrap">
+  <canvas id="main-canvas"></canvas>
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- DOOR SCENE -->
+  <div id="door-scene">
+    <div id="door-frame">
+      <div id="door-glow"></div>
+      <!-- Frame edges -->
+      <div class="frame-edge" id="fe-top"></div>
+      <div class="frame-edge" id="fe-bot"></div>
+      <div class="frame-edge" id="fe-l"></div>
+      <div class="frame-edge" id="fe-r"></div>
+      <!-- Left half -->
+      <div class="door-half" id="door-half-l">
+        <div class="ridge" style="top:17%"></div>
+        <div class="ridge" style="top:35%"></div>
+        <div class="ridge" style="top:55%"></div>
+        <div class="ridge" style="top:74%"></div>
+        <div class="bolt" style="top:10px;left:10px"></div>
+        <div class="bolt" style="bottom:10px;left:10px"></div>
+      </div>
+      <!-- Right half -->
+      <div class="door-half" id="door-half-r">
+        <div class="ridge" style="top:17%"></div>
+        <div class="ridge" style="top:35%"></div>
+        <div class="ridge" style="top:55%"></div>
+        <div class="ridge" style="top:74%"></div>
+        <div class="bolt" style="top:10px;right:10px"></div>
+        <div class="bolt" style="bottom:10px;right:10px"></div>
+      </div>
+      <!-- Lock indicator -->
+      <div id="lock-center">
+        <div class="lc-ring">
+          <div class="lc-dot"></div>
+        </div>
+        <div class="lc-txt" id="lc-label">UNLOCKED</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CORRIDOR SCENE -->
+  <div id="corridor-scene">
+    <div id="corridor-inner">
+      <canvas id="corr-canvas"></canvas>
+      <div id="blue-glow"></div>
+      <div id="corr-red-glow"></div>
+      <!-- Locker door -->
+      <div id="locker-wrap">
+        <div id="locker-door">
+          <div class="ld-ridge" style="top:18%"></div>
+          <div class="ld-ridge" style="top:40%"></div>
+          <div class="ld-ridge" style="top:62%"></div>
+          <div class="ld-ridge" style="top:82%"></div>
+          <div id="ld-badge">
+            <div class="red-dot"></div>
+            <div class="red-label">LOCKED</div>
+          </div>
+        </div>
+        <div id="locker-label">SECTOR-7 // RESTRICTED ACCESS</div>
+      </div>
+      <div id="dof-vignette"></div>
+    </div>
+  </div>
+</div>
+
+<!-- HOLOGRAPHIC PANEL -->
+<div id="holo-scene">
+  <div id="holo-card">
+    <div class="h-sweep"></div>
+    <div class="h-scan"></div>
+    <div class="h-net">// CodeEscape Network //</div>
+    <div id="h-title"></div>
+    <div id="h-sub"></div>
+    <div id="h-reach"></div>
+    <div class="h-divider"></div>
+    <div id="h-declare"></div>
+    <div id="h-warn"></div>
+    <div id="h-store"></div>
+    <div id="h-proceed">Enter your age to proceed to the next level.</div>
+    <div id="h-status">
+      <div class="h-sdot"></div>
+      <span>CHECKPOINT ACTIVE // LOCKER LOCKED // AWAITING IDENTITY</span>
+    </div>
+  </div>
+</div>
+
+<!-- Blue global ambient (holo glow on environment) -->
+<div id="blue-glow-global" style="position:fixed;inset:0;z-index:14;pointer-events:none;background:radial-gradient(ellipse at 50% 52%,rgba(0,80,255,.1) 0%,transparent 62%);opacity:0;transition:opacity 1.4s;"></div>
+
+<button id="skip-btn" onclick="doSkip()">SKIP ›</button>
+
+<script>
+// ── HELPERS ──
+const $=id=>document.getElementById(id);
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+// ── TYPE TEXT ──
+function typeText(el,text,spd,cb){
+  let i=0;el.innerHTML='';
+  const t=setInterval(()=>{
+    el.innerHTML=text.slice(0,++i)+
+      (i<text.length?'<span class="tcursor"></span>':'');
+    if(i>=text.length){clearInterval(t);if(cb)setTimeout(cb,120);}
+  },spd);
+}
+
+// ── WEB AUDIO ──
+let ctx=null;
+function initAudio(){
+  try{ctx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}
+}
+function playDoor(){
+  if(!ctx)return;
+  // Low thud
+  const b=ctx.createBuffer(1,ctx.sampleRate*.6,ctx.sampleRate);
+  const d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.4)*.9;
+  const s=ctx.createBufferSource();s.buffer=b;
+  const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=140;
+  const g=ctx.createGain();g.gain.value=.35;
+  s.connect(f);f.connect(g);g.connect(ctx.destination);s.start();
+  // Scrape
+  const o=ctx.createOscillator();o.type='sawtooth';
+  o.frequency.setValueAtTime(70,ctx.currentTime);
+  o.frequency.linearRampToValueAtTime(30,ctx.currentTime+2);
+  const og=ctx.createGain();og.gain.setValueAtTime(.06,ctx.currentTime);og.gain.linearRampToValueAtTime(0,ctx.currentTime+2);
+  const of=ctx.createBiquadFilter();of.type='bandpass';of.frequency.value=180;
+  o.connect(of);of.connect(og);og.connect(ctx.destination);o.start();o.stop(ctx.currentTime+2);
+}
+let humGain=null;
+function playHum(){
+  if(!ctx)return;
+  const o=ctx.createOscillator();o.type='sine';o.frequency.value=55;
+  const lfo=ctx.createOscillator();lfo.frequency.value=.09;
+  const lg=ctx.createGain();lg.gain.value=5;
+  lfo.connect(lg);lg.connect(o.frequency);
+  humGain=ctx.createGain();humGain.gain.setValueAtTime(0,ctx.currentTime);
+  humGain.gain.linearRampToValueAtTime(.07,ctx.currentTime+2.5);
+  o.connect(humGain);humGain.connect(ctx.destination);
+  o.start();lfo.start();
+}
+function playHoloBoot(){
+  if(!ctx)return;
+  [220,330,440,550,660].forEach((f,i)=>{
+    const o=ctx.createOscillator();const g=ctx.createGain();
+    o.type='sine';o.frequency.value=f;
+    const t=ctx.currentTime+i*.09;
+    g.gain.setValueAtTime(.07,t);g.gain.exponentialRampToValueAtTime(.001,t+.22);
+    o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.25);
+  });
+}
+
+// ── PARTICLE CANVAS ──
+const pC=$('particle-canvas');const pX=pC.getContext('2d');
+let parts=[];
+function rP(){pC.width=window.innerWidth;pC.height=window.innerHeight;}
+window.addEventListener('resize',rP);rP();
+let partActive=false;
+function spawnPart(){
+  return{
+    x:Math.random()*pC.width,y:Math.random()*pC.height,
+    r:Math.random()*.7+.1,
+    vx:(Math.random()-.5)*.12,vy:(Math.random()-.5)*.09-.03,
+    a:Math.random()*.35+.05,
+    c:Math.random()>.5?'185,200,215':'160,140,120'
+  };
+}
+(function pLoop(){
+  pX.clearRect(0,0,pC.width,pC.height);
+  parts.forEach((p,i)=>{
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.y<-4||p.x<-4||p.x>pC.width+4)parts.splice(i,1);
+    else{
+      pX.beginPath();pX.arc(p.x,p.y,p.r,0,Math.PI*2);
+      pX.fillStyle=`rgba(${p.c},${p.a})`;
+      pX.shadowColor=`rgba(${p.c},.4)`;pX.shadowBlur=2;
+      pX.fill();pX.shadowBlur=0;
+    }
+  });
+  if(partActive&&parts.length<100)parts.push(spawnPart());
+  requestAnimationFrame(pLoop);
+})();
+
+// ── MAIN CANVAS (dark bg gradient) ──
+const mC=$('main-canvas');const mX=mC.getContext('2d');
+let orangeAlpha=0;
+function rM(){mC.width=window.innerWidth;mC.height=window.innerHeight;}
+window.addEventListener('resize',rM);rM();
+(function mLoop(){
+  mX.clearRect(0,0,mC.width,mC.height);
+  const bg=mX.createRadialGradient(mC.width*.5,mC.height*.5,.1,mC.width*.5,mC.height*.5,mC.width*.7);
+  bg.addColorStop(0,'#030a14');bg.addColorStop(.7,'#020810');bg.addColorStop(1,'#010508');
+  mX.fillStyle=bg;mX.fillRect(0,0,mC.width,mC.height);
+  if(orangeAlpha>0){
+    const og=mX.createRadialGradient(mC.width*.5,mC.height*.5,.1,mC.width*.5,mC.height*.6,mC.width*.5);
+    og.addColorStop(0,`rgba(255,140,30,${orangeAlpha*.4})`);
+    og.addColorStop(.5,`rgba(200,60,10,${orangeAlpha*.15})`);
+    og.addColorStop(1,'transparent');
+    mX.fillStyle=og;mX.fillRect(0,0,mC.width,mC.height);
+  }
+  if(Math.random()<.005){mX.fillStyle='rgba(0,245,255,.04)';mX.fillRect(0,Math.random()*mC.height,mC.width,Math.random()*2+1);}
+  requestAnimationFrame(mLoop);
+})();
+
+// ── CORRIDOR CANVAS ──
+const cC=$('corr-canvas');const cX=cC.getContext('2d');
+function drawCorridor(){
+  cC.width=cC.parentElement.clientWidth||window.innerWidth;
+  cC.height=cC.parentElement.clientHeight||window.innerHeight;
+  const W=cC.width,H=cC.height;
+  const vx=W*.5,vy=H*.5;
+  const margin=.28;// corridor mouth at 28% from edges
+  const tl={x:W*margin,y:H*margin};
+  const tr={x:W*(1-margin),y:H*margin};
+  const bl={x:W*margin,y:H*(1-margin)};
+  const br={x:W*(1-margin),y:H*(1-margin)};
+
+  // Dark base
+  const base=cX.createLinearGradient(0,0,W,H);
+  base.addColorStop(0,'#030a14');base.addColorStop(1,'#020810');
+  cX.fillStyle=base;cX.fillRect(0,0,W,H);
+
+  // Warm rear glow (from open door behind)
+  const rg=cX.createRadialGradient(vx,vy,.5,vx,vy,W*.22);
+  rg.addColorStop(0,'rgba(255,130,30,.35)');rg.addColorStop(.6,'rgba(200,70,15,.08)');rg.addColorStop(1,'transparent');
+  cX.fillStyle=rg;cX.fillRect(0,0,W,H);
+
+  function trapFill(corners,color){
+    cX.beginPath();cX.moveTo(corners[0].x,corners[0].y);
+    corners.forEach(c=>cX.lineTo(c.x,c.y));
+    cX.closePath();cX.fillStyle=color;cX.fill();
+  }
+  function trapStroke(corners,color,lw){
+    cX.beginPath();cX.moveTo(corners[0].x,corners[0].y);
+    corners.forEach(c=>cX.lineTo(c.x,c.y));
+    cX.closePath();cX.strokeStyle=color;cX.lineWidth=lw;cX.stroke();
+  }
+
+  // Ceiling
+  trapFill([{x:0,y:0},{x:W,y:0},tr,tl],'#080f1a');
+  trapStroke([{x:0,y:0},{x:W,y:0},tr,tl],'rgba(0,60,120,.3)',.5);
+
+  // Floor
+  const floorGrad=cX.createLinearGradient(0,H*.5,0,H);
+  floorGrad.addColorStop(0,'#050d18');floorGrad.addColorStop(1,'#030810');
+  trapFill([bl,br,{x:W,y:H},{x:0,y:H}],floorGrad);
+
+  // Left wall
+  const lwGrad=cX.createLinearGradient(0,0,W*.28,0);
+  lwGrad.addColorStop(0,'#050c18');lwGrad.addColorStop(1,'#0a1521');
+  trapFill([{x:0,y:0},tl,bl,{x:0,y:H}],lwGrad);
+
+  // Right wall
+  const rwGrad=cX.createLinearGradient(W,0,W*(1-.28),0);
+  rwGrad.addColorStop(0,'#050c18');rwGrad.addColorStop(1,'#0a1521');
+  trapFill([tr,{x:W,y:0},{x:W,y:H},br],rwGrad);
+
+  // Center corridor tunnel (dark inner)
+  const innGrad=cX.createRadialGradient(vx,vy,.5,vx,vy,W*.2);
+  innGrad.addColorStop(0,'rgba(8,18,30,.4)');innGrad.addColorStop(1,'rgba(0,0,0,.1)');
+  trapFill([tl,tr,br,bl],innGrad);
+
+  // Perspective grid lines on ceiling/floor
+  for(let i=1;i<6;i++){
+    const t=i/6;
+    const y0=H*margin*(1-t);const x0=W*margin*t;
+    // Ceiling line
+    cX.beginPath();cX.moveTo(0,H*margin*t);cX.lineTo(tl.x+t*(vx-tl.x),tl.y+t*(vy-tl.y));cX.strokeStyle='rgba(0,60,110,.2)';cX.lineWidth=.5;cX.stroke();
+    cX.beginPath();cX.moveTo(W,H*margin*t);cX.lineTo(tr.x+t*(vx-tr.x),tr.y+t*(vy-tr.y));cX.stroke();
+    // Floor line
+    cX.beginPath();cX.moveTo(0,H-H*margin*t);cX.lineTo(bl.x+t*(vx-bl.x),bl.y+t*(vy-bl.y));cX.stroke();
+    cX.beginPath();cX.moveTo(W,H-H*margin*t);cX.lineTo(br.x+t*(vx-br.x),br.y+t*(vy-br.y));cX.stroke();
+  }
+
+  // Neon edge strips on walls (left and right)
+  // Left edge
+  const lsGrad=cX.createLinearGradient(0,H*.3,0,H*.7);
+  lsGrad.addColorStop(0,'transparent');lsGrad.addColorStop(.5,'rgba(0,150,255,.55)');lsGrad.addColorStop(1,'transparent');
+  cX.strokeStyle=lsGrad;cX.lineWidth=2;
+  cX.beginPath();cX.moveTo(tl.x,tl.y);cX.lineTo(bl.x,bl.y);cX.stroke();
+  cX.shadowColor='rgba(0,150,255,.6)';cX.shadowBlur=8;cX.stroke();cX.shadowBlur=0;
+
+  // Right edge strip
+  const rsGrad=cX.createLinearGradient(0,H*.3,0,H*.7);
+  rsGrad.addColorStop(0,'transparent');rsGrad.addColorStop(.5,'rgba(0,120,220,.45)');rsGrad.addColorStop(1,'transparent');
+  cX.strokeStyle=rsGrad;
+  cX.beginPath();cX.moveTo(tr.x,tr.y);cX.lineTo(br.x,br.y);cX.stroke();
+  cX.shadowColor='rgba(0,120,220,.5)';cX.shadowBlur=6;cX.stroke();cX.shadowBlur=0;
+
+  // Ceiling neon strip center
+  cX.beginPath();cX.moveTo(W*.5,0);cX.lineTo(vx,vy);
+  const csGrad=cX.createLinearGradient(W*.5,0,vx,vy);
+  csGrad.addColorStop(0,'rgba(0,180,255,.12)');csGrad.addColorStop(1,'transparent');
+  cX.strokeStyle=csGrad;cX.lineWidth=3;cX.stroke();
+
+  // Orange reflection on floor
+  const ofGrad=cX.createRadialGradient(vx,vy*.95,.1,vx,vy*.95,W*.18);
+  ofGrad.addColorStop(0,'rgba(255,100,20,.18)');ofGrad.addColorStop(1,'transparent');
+  cX.fillStyle=ofGrad;cX.fillRect(0,0,W,H);
+
+  // Fog / atmospheric haze
+  const fogGrad=cX.createRadialGradient(vx,vy,.5,vx,vy,W*.28);
+  fogGrad.addColorStop(0,'transparent');fogGrad.addColorStop(.7,'transparent');
+  fogGrad.addColorStop(1,'rgba(5,10,22,.25)');
+  cX.fillStyle=fogGrad;cX.fillRect(0,0,W,H);
+
+  // Edge vignette
+  const vigGrad=cX.createRadialGradient(vx,vy,.1,vx,vy,W*.58);
+  vigGrad.addColorStop(0,'transparent');vigGrad.addColorStop(.65,'transparent');
+  vigGrad.addColorStop(1,'rgba(0,0,0,.55)');
+  cX.fillStyle=vigGrad;cX.fillRect(0,0,W,H);
+}
+
+// ── TIMELINE ──
+let started=false;
+function autoStart(){if(!started){started=true;initAudio();runTimeline();}}
+document.addEventListener('click',autoStart,{once:true});
+document.addEventListener('keydown',autoStart,{once:true});
+setTimeout(autoStart,500);
+
+async function runTimeline(){
+  // Open letterbox
+  $('bar-top').classList.add('open');$('bar-bot').classList.add('open');
+  playHum();
+
+  // t=0.4s: Lock indicator
+  await delay(400);
+  $('lc-label').textContent='UNLOCKED';
+
+  // t=0.8s: Door opens — orange glow floods in
+  await delay(400);
+  playDoor();
+  $('door-glow').style.opacity='1';
+  let oa=0;const ogT=setInterval(()=>{orangeAlpha=Math.min(.8,oa+=.04);if(orangeAlpha>=.6)clearInterval(ogT);},30);
+  await delay(300);
+  $('door-half-l').classList.add('open');
+  $('door-half-r').classList.add('open');
+
+  // t=2.2s: Corridor reveal — camera dolly starts
+  await delay(1800);
+  orangeAlpha=0;
+  $('lock-center').style.opacity='0';
+  const ds=$('door-scene');ds.style.transition='opacity .7s';ds.style.opacity='0';
+  drawCorridor();
+  const cs=$('corridor-scene');cs.classList.add('show');
+  partActive=true;for(let i=0;i<60;i++)parts.push(spawnPart());
+  await delay(300);
+  $('scene-wrap').classList.add('shaking');
+  $('corridor-inner').classList.add('dolly');
+  await delay(700);ds.style.display='none';
+
+  // t=4.5s: approaching locker — red warning
+  await delay(1800);
+
+  // t=5s: Holo panel appears
+  playHoloBoot();
+  $('blue-glow').classList.add('show');
+  $('blue-glow-global').style.opacity='1';
+  const hs=$('holo-scene');hs.classList.add('show');
+  await delay(550);
+
+  // t=5.5s: "🔷 SYSTEM CHECKPOINT"
+  await new Promise(r=>typeText($('h-title'),'🔷 SYSTEM CHECKPOINT',62,r));
+  await delay(250);
+  // "Identity verification required."
+  await new Promise(r=>typeText($('h-sub'),'Identity verification required.',44,r));
+  await delay(200);
+  // "You have reached a restricted locker."
+  await new Promise(r=>typeText($('h-reach'),'You have reached a restricted locker.',42,r));
+  await delay(800);// pause
+
+  // "Declare your identity to proceed."
+  await new Promise(r=>typeText($('h-declare'),'Declare your identity to proceed.',40,r));
+  await delay(500);
+
+  // "⚠ Raw values are rejected."
+  await new Promise(r=>typeText($('h-warn'),'⚠ Raw values are rejected.',40,r));
+  await delay(350);
+
+  // "Store your identity first… then reveal it."
+  await new Promise(r=>typeText($('h-store'),'Store your identity first… then reveal it.',38,r));
+  await delay(700);
+
+  // Proceed instruction fades in
+  $('h-proceed').classList.add('show');
+  // Cinematic holds — environment lit blue, locker waits
+}
+
+async function doSkip(){
+  // Skip straight to final state
+  $('door-scene').style.display='none';
+  $('corridor-scene').classList.add('show');
+  drawCorridor();partActive=true;
+  for(let i=0;i<80;i++)parts.push(spawnPart());
+  $('scene-wrap').classList.add('shaking');
+  $('blue-glow').classList.add('show');
+  $('blue-glow-global').style.opacity='1';
+  const hs=$('holo-scene');hs.style.animation='none';hs.style.opacity='1';hs.style.pointerEvents='auto';
+  $('h-title').innerHTML='🔷 SYSTEM CHECKPOINT';
+  $('h-sub').innerHTML='Identity verification required.';
+  $('h-reach').innerHTML='You have reached a restricted locker.';
+  $('h-declare').innerHTML='Declare your identity to proceed.';
+  $('h-warn').innerHTML='⚠ Raw values are rejected.';
+  $('h-store').innerHTML='Store your identity first… then reveal it.';
+  $('h-proceed').innerHTML='Enter your age to proceed to the next level.';
+  $('h-proceed').classList.add('show');
+  $('bar-top').classList.add('open');$('bar-bot').classList.add('open');
+}
+</script>
+</body>
+</html>
