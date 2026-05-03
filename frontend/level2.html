@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AXIOM OS - Level 2 Phase 1</title>
+    <style>
+        :root {
+            --bg-color: #02020a;
+            --green: #00ff88;
+            --teal: #5DCAA5;
+            --teal-dim: rgba(93, 202, 165, 0.3);
+            --font-main: 'Courier New', Courier, monospace;
+            --glow-green: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-teal: 0 0 10px rgba(93, 202, 165, 0.5), 0 0 20px rgba(93, 202, 165, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--green);
+            font-family: var(--font-main);
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-top: 2rem;
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        .recall-input {
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            padding: 0.5rem;
+            width: 150px;
+            text-align: center;
+            outline: none;
+            margin-top: 1rem;
+        }
+
+        .signal-bar {
+            display: flex;
+            gap: 4px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+
+        .sig-block {
+            width: 15px;
+            height: 22px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+
+        .sig-block.active.green {
+            background: var(--green);
+            box-shadow: 0 0 10px var(--green);
+        }
+
+        .sig-block.active.amber {
+            background: var(--amber);
+            box-shadow: 0 0 10px var(--amber);
+        }
+
+        .sig-block.active.red {
+            background: var(--red);
+            box-shadow: 0 0 10px var(--red);
+        }
+
+        .screen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--bg-color);
+            z-index: 100;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* --- BACKGROUND EFFECTS --- */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%,
+                    rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg,
+                    rgba(255, 0, 0, 0.06),
+                    rgba(0, 255, 0, 0.02),
+                    rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background-image:
+                linear-gradient(var(--teal-dim) 1px, transparent 1px),
+                linear-gradient(90deg, var(--teal-dim) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg) translateY(-50%) translateZ(0);
+            animation: grid-move 20s linear infinite;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 2s ease-in;
+            will-change: transform;
+        }
+
+        .grid-bg.active {
+            opacity: 0.3;
+        }
+
+        @keyframes grid-move {
+            0% {
+                transform: perspective(500px) rotateX(60deg) translateY(-50%);
+            }
+
+            100% {
+                transform: perspective(500px) rotateX(60deg) translateY(0%);
+            }
+        }
+
+        #particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            background-color: var(--teal);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: float linear infinite;
+            will-change: transform, opacity;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translateY(-100px);
+                opacity: 0;
+            }
+        }
+
+        /* --- STAGE 1: INTRO --- */
+        #intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-color);
+            z-index: 50;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .intro-line {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            opacity: 0;
+            transition: opacity 0.8s ease-in;
+            color: var(--teal);
+        }
+
+        .intro-line.visible {
+            opacity: 1;
+        }
+
+        .print-large {
+            font-size: 5rem;
+            font-weight: bold;
+            color: var(--green);
+            text-shadow: var(--glow-green);
+            margin: 2rem 0;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .print-large.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .observe-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            padding: 1rem 2rem;
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.3s;
+            margin-top: 2rem;
+            box-shadow: var(--glow-green);
+        }
+
+        .observe-btn:hover {
+            background: var(--green);
+            color: var(--bg-color);
+            box-shadow: 0 0 30px var(--green);
+        }
+
+        #standby-screen {
+            background-color: #000;
+            z-index: 1000;
+        }
+
+        .standby-text {
+            font-size: 1.2rem;
+            color: var(--green);
+            font-family: monospace;
+            margin-bottom: 2rem;
+        }
+
+        .initiate-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            padding: 1rem 2rem;
+            font-family: monospace;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: var(--glow-green);
+            transition: all 0.2s;
+        }
+
+        .initiate-btn:hover {
+            background: var(--green);
+            color: #000;
+            box-shadow: 0 0 20px var(--green);
+        }
+
+        /* ═══ FIX 1: GLITCH OVERLAY COLOR ═══ */
+        .glitch-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #000;
+            opacity: 0;
+            z-index: 2000;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+        }
+
+        .observe-btn.visible {
+            opacity: 1;
+        }
+
+        /* --- HUD --- */
+        #hud {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            border-bottom: 1px solid var(--teal-dim);
+            background: rgba(2, 2, 10, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 40;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            justify-content: space-between;
+            transform: translateZ(0);
+        }
+
+        .hud-left,
+        .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .badge {
+            border: 1px solid var(--teal);
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            color: var(--teal);
+        }
+
+        .progress-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border: 1px solid var(--teal);
+            border-radius: 50%;
+        }
+
+        .dot.active {
+            background: var(--teal);
+            box-shadow: var(--glow-teal);
+        }
+
+        .skip-btn {
+            background: transparent;
+            border: none;
+            color: var(--teal-dim);
+            cursor: pointer;
+            font-family: var(--font-main);
+            font-size: 0.8rem;
+            text-decoration: underline;
+        }
+
+        .skip-btn:hover {
+            color: var(--teal);
+        }
+
+        /* --- STAGE 2: MAIN INTERFACE --- */
+        #game-screen {
+            display: none;
+            width: 100%;
+            min-height: 100vh;
+            padding-top: 60px;
+            padding-bottom: 3rem;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+            position: relative;
+        }
+
+        .narrative-strip {
+            width: 90%;
+            max-width: 1200px;
+            height: 50px;
+            margin: 1rem 0;
+            border: 1px solid var(--teal-dim);
+            background: rgba(93, 202, 165, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--teal);
+            font-style: italic;
+            padding: 0 1rem;
+        }
+
+        .panels-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            width: 95%;
+            max-width: 1400px;
+            flex-grow: 1;
+            margin-bottom: 2rem;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            border: 1px solid var(--teal-dim);
+            background: rgba(2, 2, 10, 0.5);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            transform: translateZ(0);
+        }
+
+        .panel-header {
+            background: var(--teal-dim);
+            padding: 5px 15px;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        /* CODE PANEL */
+        #code-panel .content {
+            padding: 1.5rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: var(--green);
+        }
+
+        .code-line {
+            margin-bottom: 0.5rem;
+            white-space: pre;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1.2rem;
+            background: var(--green);
+            vertical-align: middle;
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* FLOW PANEL */
+        #flow-panel .content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 2rem;
+            position: relative;
+        }
+
+        .flow-shape {
+            width: 180px;
+            height: 60px;
+            border: 2px solid var(--teal-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--teal);
+            z-index: 5;
+        }
+
+        .flow-shape.pill {
+            border-radius: 30px;
+        }
+
+        .flow-shape.rect {
+            border-radius: 4px;
+        }
+
+        .flow-shape.para {
+            transform: skew(-20deg);
+        }
+
+        .flow-shape.para span {
+            transform: skew(20deg);
+        }
+
+        .flow-shape.active {
+            border-color: var(--green);
+            color: var(--green);
+            box-shadow: var(--glow-green);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .arrow {
+            width: 2px;
+            height: 40px;
+            background: var(--teal-dim);
+            position: relative;
+        }
+
+        .arrow::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: -4px;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid var(--teal-dim);
+        }
+
+        .travel-dot {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: var(--green);
+            border-radius: 50%;
+            box-shadow: var(--glow-green);
+            z-index: 10;
+            display: none;
+        }
+
+        /* OUTPUT PANEL */
+        #output-panel .content {
+            padding: 1.5rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .output-line {
+            color: var(--teal);
+            margin-bottom: 0.5rem;
+        }
+
+        /* --- STAGE 3: MODAL --- */
+        #modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 10, 0.9);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            border: 2px solid var(--green);
+            padding: 3rem;
+            background: var(--bg-color);
+            box-shadow: var(--glow-green);
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: var(--green);
+        }
+
+        .input-area {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+
+        #user-input {
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--green);
+            color: var(--green);
+            font-family: var(--font-main);
+            font-size: 2rem;
+            width: 250px;
+            text-align: center;
+            outline: none;
+        }
+
+        .run-btn {
+            background: var(--green);
+            color: var(--bg-color);
+            border: none;
+            padding: 1rem 3rem;
+            font-size: 1.2rem;
+            font-family: var(--font-main);
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .run-btn:hover {
+            box-shadow: 0 0 20px var(--green);
+            transform: scale(1.05);
+        }
+
+        /* --- STAGE 4: BRIDGE --- */
+        #bridge-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+            text-align: center;
+        }
+
+        .bridge-line {
+            font-size: 1.5rem;
+            color: var(--teal);
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            transition: opacity 1.2s ease-in;
+        }
+
+        .phase2-btn {
+            border: 1px solid var(--green);
+            color: var(--green);
+            background: transparent;
+            padding: 1rem 2rem;
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-top: 3rem;
+            opacity: 0;
+            transition: all 1s;
+        }
+
+        .phase2-btn.visible {
+            opacity: 1;
+        }
+
+        /* ═══ RECALL FIX: CSS ANIMATION ═══ */
+        @keyframes recallShake {
+            0%,100% { transform: translateX(0); }
+            20%     { transform: translateX(-8px); }
+            40%     { transform: translateX(8px); }
+            60%     { transform: translateX(-5px); }
+            80%     { transform: translateX(5px); }
+        }
+
+        .recall-shake {
+            animation: recallShake 0.4s ease;
+            border-color: var(--red, #ff3355) !important;
+        }
+
+        .recall-correct {
+            border-color: var(--green, #00ff88) !important;
+            box-shadow: 0 0 12px rgba(0,255,136,0.4);
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="progress-bar" style="
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 9999;
+    display: flex; justify-content: center;
+    align-items: center; gap: 0.6rem;
+    padding: 0.4rem 1rem;
+    background: rgba(2,2,10,0.95);
+    border-bottom: 1px solid rgba(0,255,136,0.1);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.15em;
+  ">
+        <span id="pb1">LVL 1</span>
+        <span style="color:#1a3a2a">──</span>
+        <span id="pb2">LVL 2 <small onclick="replayL2Explain()" style="cursor:help; opacity:0.5">[?]</small></span>
+        <span style="color:#1a3a2a">──</span>
+        <span id="pbm2">MINI 2</span>
+        <span style="color:#1a3a2a">──</span>
+        <span id="pb3">LVL 3</span>
+        <span style="color:#1a3a2a">──</span>
+        <span id="pbm">MINI</span>
+        <span style="color:#1a3a2a">──</span>
+        <span id="pb4">LVL 4</span>
+    </div>
+
+    <button id="skip-intro-btn" onclick="skipIntro()" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: transparent;
+    border: 1px solid rgba(0,255,136,0.3);
+    color: rgba(0,255,136,0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    padding: 6px 14px;
+    cursor: pointer;
+    z-index: 999;
+    display: none;
+  ">SKIP ▶▶</button>
+
+    <div class="glitch-overlay" id="glitch-overlay"></div>
+
+    <!-- ═══ FIX 4: STANDBY CURSOR ═══ -->
+    <div id="standby-screen" class="screen active">
+        <div class="standby-text" id="standby-text">
+          > SYSTEM STANDBY. AWAITING MANUAL INITIATION...
+          <span class="cursor" style="
+            display: inline-block;
+            width: 10px; height: 1.1rem;
+            background: var(--green);
+            vertical-align: middle;
+            margin-left: 4px;
+            animation: blink 1s infinite;
+          "></span>
+        </div>
+        <button class="initiate-btn" id="initiate-btn">[ CLICK TO CONNECT ]</button>
+        <div id="autostart-hint" style="
+          margin-top: 1.2rem;
+          font-size: 0.65rem;
+          color: rgba(0,255,136,0.3);
+          font-family: monospace;
+          letter-spacing: 0.15em;
+        ">AUTO-INITIATING IN 1.4s — OR CLICK TO BEGIN</div>
+    </div>
+
+    <div class="scanlines"></div>
+    <div class="grid-bg" id="grid-bg"></div>
+    <div id="particles-container"></div>
+
+    <!-- HUD -->
+    <div id="hud" style="display: none;">
+        <div class="hud-left">
+            <div class="badge">LEVEL 02</div>
+            <div class="badge">PHASE 01: OUTPUT</div>
+            <div class="progress-dots" id="dots">
+                <div class="dot active"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+        </div>
+        <div class="hud-right">
+            <button class="skip-btn" onclick="skipToInteraction()">SKIP_TO_TEST</button>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ -->
+    <div id="worked-example-screen" class="screen">
+        <div class="modal-box">
+            <div class="modal-title" style="color: var(--amber);">WORKED EXAMPLE</div>
+            <div id="example-content"
+                style="text-align: left; font-family: 'Courier New', monospace; margin: 1.5rem 0; line-height: 1.8;">
+            </div>
+            <button id="example-btn" class="run-btn" onclick="showConfidence()">[ I UNDERSTAND ▶ ]</button>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 5: CONFIDENCE ═══ -->
+    <div id="confidence-screen" class="screen">
+        <div class="modal-box">
+            <div class="modal-title" style="color: var(--teal);">"Before you begin..."<br>How confident are you feeling?
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                <button class="observe-btn visible" style="margin:0" onclick="saveConfidence(1)">1 — Not Sure</button>
+                <button class="observe-btn visible" style="margin:0" onclick="saveConfidence(2)">2 — Somewhat</button>
+                <button class="observe-btn visible" style="margin:0" onclick="saveConfidence(3)">3 — Ready</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ FIX L2-1: CR-HINT-BOX HTML ═══ -->
+    <div id="confidence-response" class="screen">
+        <div class="modal-box" style="
+          max-width:520px; width:92%; text-align:left;">
+
+          <div id="cr-label" style="
+            font-size:0.65rem; letter-spacing:0.3em;
+            margin-bottom:1.2rem; opacity:0.5;">
+            SYSTEM_RESPONSE //
+          </div>
+
+          <div id="cr-message" style="
+            font-size:1.05rem; line-height:1.9;
+            margin-bottom:1.5rem; min-height:4rem;">
+          </div>
+
+          <!-- Rating 1 only: concept reminder -->
+          <div id="cr-hint-box" style="
+            display:none;
+            border:1px dashed rgba(0,255,136,0.25);
+            background:rgba(0,255,136,0.03);
+            padding:1rem 1.2rem; margin-bottom:1.2rem;
+            font-size:0.82rem; line-height:1.8;
+            color:rgba(255,255,255,0.55);">
+          </div>
+
+          <!-- Rating 1 only: past mistake count -->
+          <div id="cr-stat" style="
+            display:none; font-size:0.68rem;
+            letter-spacing:0.12em; margin-bottom:1.2rem;
+            opacity:0.4;">
+          </div>
+
+          <button id="cr-btn" style="
+            display:none; width:100%;
+            background:transparent;
+            border:1px solid var(--green);
+            color:var(--green);
+            font-family:var(--font-main);
+            font-size:0.95rem; letter-spacing:0.12em;
+            padding:0.9rem 1.5rem; cursor:pointer;
+            transition:all 0.2s; text-align:center;">
+          </button>
+
+        </div>
+    </div>
+
+    <!-- STAGE 1: INTRO -->
+    <div id="intro-screen">
+        <div id="intro-text"></div>
+        <div id="print-command" class="print-large">print()</div>
+        <button id="observe-btn" class="observe-btn">OBSERVE THE SYSTEM</button>
+    </div>
+
+    <!-- STAGE 2: MAIN -->
+    <div id="game-screen">
+        <div id="narrative" class="narrative-strip">Initializing monitoring layer...</div>
+
+        <div class="panels-container">
+            <!-- CODE PANEL -->
+            <div class="panel" id="code-panel">
+                <div class="panel-header">CODE_SOURCE</div>
+                <div class="content" id="code-content"></div>
+            </div>
+
+            <!-- FLOW PANEL -->
+            <div class="panel" id="flow-panel">
+                <div class="panel-header">EXECUTION_FLOW</div>
+                <div class="content">
+                    <div class="flow-shape pill" id="step1"><span>YOU WRITE</span></div>
+                    <div class="arrow"></div>
+                    <div class="flow-shape rect" id="step2"><span>print() EXECUTES</span></div>
+                    <div class="arrow"></div>
+                    <div class="flow-shape para" id="step3"><span>OUTPUT</span></div>
+                    <div class="arrow"></div>
+                    <div class="flow-shape pill" id="step4"><span>ON SCREEN</span></div>
+
+                    <div id="travel-dot" class="travel-dot"></div>
+                </div>
+            </div>
+
+            <!-- OUTPUT PANEL -->
+            <div class="panel" id="output-panel">
+                <div class="panel-header">TERMINAL_OUTPUT</div>
+                <div class="content" id="output-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STAGE 3: MODAL -->
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">THE SYSTEM IS LISTENING. SPEAK.</div>
+            <div class="input-area">
+                <span>print("</span>
+                <input type="text" id="user-input" maxlength="20" autofocus>
+                <span>")</span>
+            </div>
+            <button class="run-btn" onclick="runUserCode()">RUN COMMAND</button>
+        </div>
+    </div>
+
+    <!-- STAGE 4: BRIDGE -->
+    <div id="bridge-screen">
+        <div id="bridge-block" style="margin-bottom: 2rem;"></div>
+        <div id="bridge-text"></div>
+        <button id="phase2-btn" class="phase2-btn" onclick="completeLevel2()">ENTER PHASE 2</button>
+        <div style="margin-top: 2rem;">
+            <button class="skip-btn" onclick="replayL2Explain()" style="font-size: 0.7rem; opacity: 0.5;">↺ REPLAY
+                EXPLANATION</button>
+        </div>
+        <!-- ═══ FIX L2-5: HUB BUTTON ═══ -->
+        <div style="margin-top:1rem">
+          <button onclick="window.location.href='hub.html'"
+                  style="background:transparent;border:none;
+                         color:rgba(93,202,165,0.25);
+                         font-family:var(--font-main);
+                         font-size:0.6rem;cursor:pointer;
+                         letter-spacing:0.1em;"
+                  onmouseover="this.style.color='var(--teal)'"
+                  onmouseout="this.style.color='rgba(93,202,165,0.25)'">
+            ↩ RETURN TO HUB
+          </button>
+        </div>
+    </div>
+
+    <script>
+        // ═══ FIX 1: MISSING DECLARATIONS ═══
+        let puzzleStartTime = 0;
+        // ═══ RECALL FIX: recallAttempts COUNTER ═══
+        let recallAttempts = 0;
+
+        function getName() {
+            const state = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+            );
+            return state.playerName || 'OPERATIVE';
+        }
+
+        /* ═══ IMPROVEMENT 2: EMOTIONAL MEMORY ═══ */
+        function getEmotionalMemory() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const l1 = state.levels?.[1] || {};
+            const name = state.playerName || "OPERATIVE";
+            const wrong = l1.wrongAttempts || 0;
+            if (wrong === 0) return [`${name} didn't hesitate on Level 1.`, "The system expected that."];
+            if (wrong <= 2) return [`You stumbled in Level 1, ${name}.`, "The system remembers."];
+            return [`Level 1 cost you, ${name}.`, "It won't get easier."];
+        }
+
+        /* ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ */
+        async function showWorkedExample() {
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('worked-example-screen').classList.add('active');
+            
+            // Show button immediately for intentional navigation
+            document.getElementById('example-btn').style.display = 'block';
+            
+            const target = document.getElementById('example-content');
+            const lines = [
+                { text: "// Observe this command.", cls: 'teal' },
+                { text: 'print("HELLO")', cls: 'green' },
+                { text: "// It tells the system to display text.", cls: 'teal' },
+                { text: "// Now you face a similar challenge.", cls: 'teal' }
+            ];
+            for (let line of lines) {
+                const div = document.createElement('div');
+                div.style.color = `var(--${line.cls})`;
+                target.appendChild(div);
+                await new Promise(r => {
+                    let i = 0;
+                    const inv = setInterval(() => {
+                        div.textContent = line.text.slice(0, i);
+                        i++;
+                        if (i > line.text.length) { clearInterval(inv); r(); }
+                    }, 20);
+                });
+                await new Promise(r => setTimeout(r, 400));
+            }
+        }
+
+        /* ═══ IMPROVEMENT 5: CONFIDENCE ═══ */
+        function showConfidence() {
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('confidence-screen').classList.add('active');
+        }
+        // ═══ CONFIDENCE RESPONSE: SAVE ═══
+        function saveConfidence(val) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            if (!state.levels) state.levels = {};
+            if (!state.levels[2]) state.levels[2] = {};
+            state.levels[2].confidenceRating = val;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+
+            document.getElementById('confidence-screen').classList.remove('active');
+            showConfidenceResponse(val);
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        // ═══ RECALL FIX: showRecall ═══
+        function showRecall() {
+            recallAttempts = 0;
+            const overlay = document.getElementById('modal-overlay');
+            overlay.style.display = 'flex';
+            const box = overlay.querySelector('.modal-box');
+            box.innerHTML = `
+              <div class="modal-title" style="font-size:1rem;">
+                ACTIVE RECALL
+              </div>
+              <p style="margin-top:0.5rem;
+                        color:rgba(255,255,255,0.6);
+                        font-size:0.88rem;">
+                Type the command you just used to make the 
+                system speak:
+              </p>
+              <div style="margin:1.5rem 0;">
+                <input type="text"
+                       id="recall-input"
+                       class="recall-input"
+                       placeholder="type here..."
+                       autocomplete="off"
+                       onkeydown="if(event.key==='Enter')
+                                  confirmRecall('print')">
+              </div>
+              <div id="recall-feedback"
+                   style="min-height:2.5rem;
+                          margin-bottom:1rem;
+                          font-size:0.82rem;
+                          line-height:1.6;">
+              </div>
+              <button class="run-btn"
+                      onclick="confirmRecall('print')">
+                CONFIRM ▶
+              </button>
+            `;
+            document.getElementById('recall-input').focus();
+        }
+
+        // ═══ RECALL FIX: confirmRecall ═══
+        function confirmRecall(correctVal) {
+            const input    = document.getElementById('recall-input');
+            const feedback = document.getElementById('recall-feedback');
+
+            if (!input || !feedback) return;
+
+            const raw = input.value.trim();
+            const val = raw.toLowerCase();
+            const cv  = correctVal.toString().toLowerCase();
+
+            // ── EMPTY INPUT ───────────────────────────────────
+            if (raw === '') {
+                feedback.innerHTML =
+                    '<span style="color:var(--red,#ff3355)">' +
+                    'The system requires an answer.' +
+                    '</span>';
+                input.focus();
+                return; // do not count as attempt
+            }
+
+            // ── CORRECT ───────────────────────────────────────
+            if (val === cv) {
+                input.classList.remove('recall-shake');
+                input.classList.add('recall-correct');
+                feedback.innerHTML =
+                    '<span style="color:var(--green,#00ff88)">' +
+                    `Confirmed. ${correctVal} locked in. ✓` +
+                    '</span>';
+
+                // Save correct recall
+                const state = JSON.parse(
+                    localStorage.getItem('cer_state') || '{}'
+                );
+                if (!state.levels) state.levels = {};
+                if (!state.levels[2])
+                    state.levels[2] = {};
+                state.levels[2].typedRecall = true;
+                localStorage.setItem(
+                    'cer_state', JSON.stringify(state)
+                );
+
+                setTimeout(proceedAfterRecall, 800);
+                return;
+            }
+
+            // ── WRONG ─────────────────────────────────────────
+            recallAttempts++;
+
+            // Shake animation
+            input.classList.remove('recall-shake');
+            void input.offsetWidth; // force reflow
+            input.classList.add('recall-shake');
+            setTimeout(() =>
+                input.classList.remove('recall-shake'), 450);
+
+            if (recallAttempts >= 3) {
+                // Max attempts — show answer and move on
+                feedback.innerHTML =
+                    '<span style="color:var(--amber,#ffcc44)">' +
+                    `The system accepts your effort.<br>` +
+                    `Answer was: <strong style="color:var(--green)">` +
+                    `${correctVal}</strong>. Remember it.` +
+                    '</span>';
+
+                // Save failed recall
+                const state = JSON.parse(
+                    localStorage.getItem('cer_state') || '{}'
+                );
+                if (!state.levels) state.levels = {};
+                if (!state.levels[2])
+                    state.levels[2] = {};
+                state.levels[2].typedRecall = false;
+                localStorage.setItem(
+                    'cer_state', JSON.stringify(state)
+                );
+
+                // Disable input and button
+                input.disabled = true;
+                const btn = document.querySelector(
+                    '#modal-overlay .run-btn, ' +
+                    '#modal-overlay .continue-btn'
+                );
+                if (btn) btn.disabled = true;
+
+                setTimeout(proceedAfterRecall, 2200);
+
+            } else {
+                // Still has attempts left
+                const remaining = 3 - recallAttempts;
+                const hint = recallAttempts === 1
+                    ? `Not quite. The answer was: ` +
+                    `<strong style="color:var(--green)">` +
+                    `${correctVal}</strong>.<br>` +
+                    `Try typing it exactly, then confirm.`
+                    : `Still incorrect. ` +
+                    `Answer: <strong style="color:var(--green)">` +
+                    `${correctVal}</strong>.<br>` +
+                    `${remaining} attempt${remaining !== 1 ? 's' : ''} ` +
+                    `remaining — type it in.`;
+
+                feedback.innerHTML =
+                    `<span style="color:var(--amber,#ffcc44)">` +
+                    `${hint}</span>`;
+
+                // Clear and refocus
+                input.value = '';
+                setTimeout(() => input.focus(), 100);
+            }
+        }
+
+        // ═══ RECALL FIX: proceedAfterRecall ═══
+        function proceedAfterRecall() {
+            startBridge();
+        }
+
+        function saveSignal(time) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const wrongCount = state.levels?.[2]?.wrongAttempts || 0;
+            let signal;
+            if (wrongCount === 0 && time < 10000) signal = 'STRONG';
+            else if (wrongCount === 0) signal = 'GOOD';
+            else if (wrongCount <= 2) signal = 'MODERATE';
+            else signal = 'WEAK';
+
+            if (!state.levels) state.levels = {};
+            if (!state.levels[2]) state.levels[2] = {};
+            state.levels[2].signal = signal;
+            state.levels[2].responseTime = time;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+        }
+
+        function getSignalHTML(signal) {
+            const map = { 'STRONG': 5, 'GOOD': 4, 'MODERATE': 3, 'WEAK': 2 };
+            const count = map[signal] || 0;
+            const color = count >= 4 ? 'green' : (count === 3 ? 'amber' : 'red');
+            let html = `<div class="signal-bar">`;
+            for (let i = 1; i <= 5; i++) {
+                html += `<div class="sig-block ${i <= count ? 'active ' + color : ''}"></div>`;
+            }
+            html += ` <span style="margin-left:8px; font-size:0.7rem; color:var(--${color === 'green' ? 'green' : color})">${signal}</span></div>`;
+            return html;
+        }
+
+        /* ═══ IMPROVEMENT 8: REPLAY ═══ */
+        function replayL2Explain() {
+            window.location.reload();
+        }
+
+        /* ═══ IMPROVEMENT 9: GHOST STATS ═══ */
+        function showGhostStats(correct) {
+            const seed = (2 * 1337 + 1 * 42);
+            const pct = 45 + (seed % 38);
+            const avg = 1 + (seed % 3);
+            const fb = document.getElementById('narrative');
+            const stats = document.createElement('div');
+            stats.style.cssText = 'color: rgba(0,255,136,0.3); font-size: 0.68rem; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.9s;';
+            stats.textContent = correct
+                ? `${pct}% of operatives solved this first try.`
+                : `You're not alone — ${100 - pct}% also struggled here. Average attempts: ${avg}`;
+            fb.appendChild(stats);
+            setTimeout(() => stats.style.opacity = '1', 900);
+        }
+
+        const introLines = [
+            "anomaly detected in sector 2.",
+            "an entity entered this layer.",
+            "it carries no credentials.",
+            "it has no way to speak.",
+            "the system cannot hear it.",
+            "it does not exist... yet.",
+            "but there is one command.",
+            "one instruction the system will always obey."
+        ];
+
+        const sequenceData = [
+            { code: 'print("...")', output: '...', narrative: 'Silent monitoring active.' },
+            { code: 'print("a signal was logged.")', output: 'a signal was logged.', narrative: 'Trace complete.' },
+            { code: 'print("entry point: unknown.")', output: 'entry point: unknown.', narrative: 'Searching for entry node.' },
+            { code: 'print("no identity found.")', output: 'no identity found.', narrative: 'Unregistered user.' },
+            { code: 'print("scanning...")', output: 'scanning...', narrative: 'Deep scan initiated.' },
+            { code: 'print("wait.")', output: 'wait.', narrative: 'Divergence detected.' },
+            { code: 'print("are you reading this?")', output: 'are you reading this?', narrative: 'Direct communication link attempt.' },
+            { code: 'print("then prove it.")', output: 'then prove it.', narrative: 'Awaiting user response.' }
+        ];
+
+        const bridgeLines = [
+            "The system has recognized your voice.",
+            "Variables are shifting.",
+            "The next layer awaits your definition.",
+            "Don't lose focus."
+        ];
+
+        // ═══ FIX 4: FUNCTION ORDER ═══
+        function createParticles() {
+            const container = document.getElementById('particles-container');
+            if (!container) return;
+            for (let i = 0; i < 30; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = Math.random() * 3 + 2;
+                p.style.width = `${size}px`;
+                p.style.height = `${size}px`;
+                p.style.left = `${Math.random() * 100}vw`;
+                p.style.animationDuration = `${Math.random() * 10 + 10}s`;
+                p.style.animationDelay = `${Math.random() * 5}s`;
+                container.appendChild(p);
+            }
+        }
+
+        let particlesCreated = false;
+        function lazyParticles() {
+            if (!particlesCreated) {
+                createParticles();
+                particlesCreated = true;
+            }
+        }
+
+        function skipIntro() {
+            // Clear boot, show puzzle immediately
+            document.getElementById('standby-screen').classList.remove('active');
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('confidence-screen').classList.remove('active');
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('game-screen').style.display = 'flex';
+            document.getElementById('skip-intro-btn').style.display = 'none';
+            lazyParticles();
+            puzzleStartTime = Date.now();
+            if (typeof runSequence === 'function') runSequence(0);
+        }
+
+        // --- STAGE 1 LOGIC ---
+        let introIdx = 0;
+        function showIntro() {
+            const container = document.getElementById('intro-text');
+            if (introIdx < introLines.length) {
+                const line = document.createElement('div');
+                line.className = 'intro-line';
+                let text = introLines[introIdx];
+                text = text.replace('{name}', getName());
+                line.textContent = text;
+                container.appendChild(line);
+                setTimeout(() => line.classList.add('visible'), 100);
+                introIdx++;
+                setTimeout(showIntro, 1400);
+            } else {
+                // ═══ FIX 5: INTRO REVEAL TIMING ═══
+                setTimeout(() => {
+                    document.getElementById('print-command')
+                            .classList.add('visible');
+                    setTimeout(() => {
+                        const sub = document.createElement('div');
+                        sub.className = 'intro-line visible';
+                        sub.style.marginTop = '1rem';
+                        sub.textContent = 
+                          `learn it. use it. make the system hear you, ${getName()}.`;
+                        document.getElementById('intro-text')
+                                .appendChild(sub);
+                        setTimeout(() => {
+                            document.getElementById('observe-btn')
+                                    .classList.add('visible');
+                        }, 800);   // was 150 — now 800ms gap
+                    }, 600);       // was 150 — now 600ms gap
+                }, 400);           // was 150 — now 400ms gap
+            }
+        }
+
+        // --- STAGE 2 LOGIC ---
+        function startStage2() {
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('game-screen').style.display = 'flex';
+            document.getElementById('skip-intro-btn').style.display = 'none';
+            puzzleStartTime = Date.now();
+            runSequence(0);
+        }
+
+        async function runSequence(index) {
+            if (index >= sequenceData.length) {
+                setTimeout(() => {
+                    document.getElementById('narrative').textContent = "The system is waiting for your command.";
+                    setTimeout(showInteractiveModal, 1200);
+                }, 1800);
+                return;
+            }
+
+            const data = sequenceData[index];
+            document.getElementById('dots').children[Math.min(index, 2)].classList.add('active');
+
+            // 1. Narrative Update
+            document.getElementById('narrative').textContent = data.narrative;
+
+            // 2. Code Typewriter
+            await typeCode(data.code);
+
+            // 3. Flow Animation
+            await playFlowAnimation(data.output);
+
+            // 4. Next Step
+            setTimeout(() => runSequence(index + 1), 700);
+        }
+
+        function typeCode(text) {
+            return new Promise(resolve => {
+                const container = document.getElementById('code-content');
+                const line = document.createElement('div');
+                line.className = 'code-line';
+                container.appendChild(line);
+
+                let i = 0;
+                const interval = setInterval(() => {
+                    line.textContent = text.slice(0, i) + (i < text.length ? '_' : '');
+                    i++;
+                    if (i > text.length) {
+                        clearInterval(interval);
+                        line.textContent = text;
+                        resolve();
+                    }
+                }, 28);
+            });
+        }
+
+        async function playFlowAnimation(outputText) {
+            const steps = ['step1', 'step2', 'step3', 'step4'];
+            const dot = document.getElementById('travel-dot');
+
+            for (let i = 0; i < steps.length; i++) {
+                const el = document.getElementById(steps[i]);
+                el.classList.add('active');
+
+                if (i < steps.length - 1) {
+                    await moveDotBetween(steps[i], steps[i + 1]);
+                }
+
+                if (i === 2) { // Step 3 is "Output"
+                    addOutput(outputText);
+                }
+
+                await new Promise(r => setTimeout(r, 350));
+                el.classList.remove('active');
+            }
+        }
+
+        function moveDotBetween(id1, id2) {
+            return new Promise(resolve => {
+                const dot = document.getElementById('travel-dot');
+                const start = document.getElementById(id1).getBoundingClientRect();
+                const end = document.getElementById(id2).getBoundingClientRect();
+
+                dot.style.display = 'block';
+                dot.style.left = `${start.left + start.width / 2 - 3}px`;
+                dot.style.top = `${start.bottom}px`;
+
+                const duration = 400;
+                const startTime = performance.now();
+
+                function animate(now) {
+                    const elapsed = now - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+
+                    const currentTop = start.bottom + (end.top - start.bottom) * progress;
+                    dot.style.top = `${currentTop}px`;
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animate);
+                    } else {
+                        dot.style.display = 'none';
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(animate);
+            });
+        }
+
+        function addOutput(text) {
+            const container = document.getElementById('output-content');
+            const line = document.createElement('div');
+            line.className = 'output-line';
+            line.textContent = `▶ ${text}`;
+            container.appendChild(line);
+        }
+
+        // --- STAGE 3 INTERACTIVE ---
+        function showInteractiveModal() {
+            document.getElementById('modal-overlay').style.display = 'flex';
+            document.getElementById('user-input').focus();
+        }
+
+        async function runUserCode() {
+            const input = document.getElementById('user-input').value || "HELLO WORLD";
+            document.getElementById('modal-overlay').style.display = 'none';
+
+            document.getElementById('narrative').textContent = "Processing user signal...";
+            saveSignal(Date.now() - puzzleStartTime);
+            showGhostStats(true);
+            await typeCode(`print("${input}")`);
+            await playFlowAnimation(input);
+
+            setTimeout(showRecall, 1800);
+        }
+
+        function skipToInteraction() {
+            // Stop current animations if any (simplified)
+            document.getElementById('modal-overlay').style.display = 'flex';
+            document.getElementById('user-input').focus();
+        }
+
+        // --- STAGE 4 BRIDGE ---
+        let bridgeIdx = 0;
+        function startBridge() {
+            document.getElementById('modal-overlay').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('bridge-screen').style.display = 'flex';
+
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const signal = state.levels?.[2]?.signal || 'WEAK';
+            const sigHTML = `<div style="font-size:0.7rem; color:rgba(93,202,165,0.5); margin-bottom:10px;">CONCEPT SIGNAL:</div>` + getSignalHTML(signal);
+            document.getElementById('bridge-block').innerHTML = sigHTML;
+
+            showBridgeLines();
+        }
+
+        function showBridgeLines() {
+            const container = document.getElementById('bridge-text');
+            if (bridgeIdx < bridgeLines.length) {
+                const line = document.createElement('div');
+                line.className = 'bridge-line';
+                line.textContent = bridgeLines[bridgeIdx];
+                container.appendChild(line);
+                setTimeout(() => line.style.opacity = 1, 100);
+                bridgeIdx++;
+                setTimeout(showBridgeLines, 1600);
+            } else {
+                setTimeout(() => {
+                    document.getElementById('phase2-btn').classList.add('visible');
+                }, 1000);
+            }
+        }
+
+        function completeLevel2() {
+            const state = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+            );
+            if (!state.levels) state.levels = {};
+            state.levels[2] = {
+                completed: true,
+                completedAt: Date.now(),
+                wrongAttempts: state.levels[2]?.wrongAttempts || 0,
+                signal: state.levels[2]?.signal,
+                responseTime: state.levels[2]?.responseTime,
+                confidenceRating: state.levels[2]?.confidenceRating,
+                typedRecall: state.levels[2]?.typedRecall
+            };
+            state.currentLevel = 3;
+
+            // ═══ IMPROVEMENT 7: ADAPTIVE DIFFICULTY ═══
+            const l1Wrong = state.levels[1]?.wrongAttempts || 0;
+            const l2Wrong = state.levels[2]?.wrongAttempts || 0;
+            const totalWrong = l1Wrong + l2Wrong;
+            state.difficulty = totalWrong === 0 ? 'hard' : (totalWrong <= 3 ? 'normal' : 'easy');
+
+            localStorage.setItem('cer_state', JSON.stringify(state));
+            window.location.href = 'minilevel2.html';
+        }
+
+        // --- BOOT TRANSITION ---
+        // ═══ FIX 2: BOOT SEQUENCE TRANSITION ═══
+        async function runBootSequence() {
+            const glitch = document.getElementById('glitch-overlay');
+            const standbyScreen = document.getElementById('standby-screen');
+
+            // Step 1: Fade standby text out first (feels intentional)
+            const standbyText = document.getElementById('standby-text');
+            const standbyBtn  = document.getElementById('initiate-btn');
+            if (standbyText) standbyText.style.transition = 'opacity 0.4s';
+            if (standbyBtn)  standbyBtn.style.transition  = 'opacity 0.4s';
+            if (standbyText) standbyText.style.opacity = '0';
+            if (standbyBtn)  standbyBtn.style.opacity  = '0';
+
+            await new Promise(r => setTimeout(r, 450));
+
+            // Step 2: Dark overlay fades IN (screen goes black — not white)
+            glitch.style.opacity = '0.92';
+            await new Promise(r => setTimeout(r, 300));
+
+            // Step 3: Remove standby while screen is dark (seamless)
+            standbyScreen.classList.remove('active');
+            document.getElementById('intro-screen').style.display = 'flex';
+            const introContainer = document.getElementById('intro-text');
+            introContainer.innerHTML = '';
+
+            // Step 4: Dark overlay fades OUT revealing intro screen
+            glitch.style.opacity = '0';
+            await new Promise(r => setTimeout(r, 400));
+
+            // Step 5: Grid bg fades in
+            document.getElementById('grid-bg').classList.add('active');
+
+            // Step 6: Small pause before boot logs begin
+            await new Promise(r => setTimeout(r, 300));
+
+            // Step 7: Show skip button
+            document.getElementById('skip-intro-btn').style.display = 'block';
+
+            // Step 8: Boot logs at readable pace
+            const bootLogs = [
+                "establishing secure connection...",
+                "bypassing firewall protocols...",
+                "injecting payload...",
+                "connection established."
+            ];
+
+            for (let log of bootLogs) {
+                const line = document.createElement('div');
+                line.className = 'intro-line';
+                line.style.fontSize  = '1rem';
+                line.style.color     = 'var(--green)';
+                line.style.opacity   = '0';
+                line.style.transition = 'opacity 0.5s ease-in';
+                line.textContent = `> ${log}`;
+                introContainer.appendChild(line);
+                // Fade in the line
+                await new Promise(r => setTimeout(r, 50));
+                line.style.opacity = '0.8';
+                // Wait for it to be readable before next line
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            await new Promise(r => setTimeout(r, 500));
+            introContainer.innerHTML = '';
+
+            showIntro();
+        }
+
+        // ═══ FIX 2: DOMCONTENTLOADED ═══
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // Emotional memory + intro lines
+            const mem = getEmotionalMemory();
+            introLines.unshift(...mem);
+
+            // Wire observe button
+            document.getElementById('observe-btn').onclick = showWorkedExample;
+
+            // ═══ FIX 5: PROGRESS BAR STYLE ═══
+            // Progress bar highlight
+            document.getElementById('pb2').style.color = '#00ff88';
+            document.getElementById('pb2').style.textShadow = '0 0 8px #00ff88';
+
+            // Mark completed levels on progress bar
+            (function markCompleted() {
+                const state = JSON.parse(
+                    localStorage.getItem('cer_state') || '{}'
+                );
+                const map = {
+                    pb1: state.levels?.[1]?.completed,
+                    pb2: state.levels?.[2]?.completed,
+                    pb3: state.levels?.[3]?.completed,
+                    pbm: state.levels?.mini?.completed,
+                    pb4: state.levels?.[4]?.completed
+                };
+                Object.entries(map).forEach(([id, done]) => {
+                    if (done) {
+                        const el = document.getElementById(id);
+                        if (el && !el.textContent.includes('✓')) {
+                            el.textContent = el.textContent + ' ✓';
+                        }
+                    }
+                });
+            })();
+
+            // FIX: single boot guard — prevents double fire
+            let bootStarted = false;
+            function startBoot() {
+                if (bootStarted) return;
+                bootStarted = true;
+                runBootSequence();
+            }
+
+            // ═══ FIX 3: AUTO-START DELAY ═══
+            // Auto-start boot after 1.4s
+            setTimeout(startBoot, 1400);
+
+            // Manual click as instant fallback
+            document.getElementById('initiate-btn').addEventListener('click', startBoot);
+
+            // Lazy particles — after first click or after 3s
+            document.addEventListener('click', lazyParticles, { once: true });
+            setTimeout(lazyParticles, 3000);
+
+        });
+
+        // ═══ CONFIDENCE RESPONSE: SHOW ═══
+        async function showConfidenceResponse(val) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const name = state.playerName || 'OPERATIVE';
+
+            const l1Wrong = state.levels?.[1]?.wrongAttempts || 0;
+            const l2Wrong = state.levels?.[2]?.wrongAttempts || 0;
+            const totalWrong = l1Wrong + l2Wrong;
+
+            document.getElementById('confidence-response').classList.add('active');
+
+            const msgEl = document.getElementById('cr-message');
+            const hintEl = document.getElementById('cr-hint-box');
+            const statEl = document.getElementById('cr-stat');
+            const btn = document.getElementById('cr-btn');
+            const label = document.getElementById('cr-label');
+
+            const cfg = getResponseConfig(val, name, totalWrong);
+
+            label.style.color = cfg.color;
+            label.textContent = cfg.label;
+
+            msgEl.style.color = cfg.color;
+            await typewriterCR(msgEl, cfg.message, 20);
+
+            if (val === 1) {
+                hintEl.style.display = 'block';
+                hintEl.innerHTML = getLevelHint();
+
+                if (totalWrong > 0) {
+                    statEl.style.display = 'block';
+                    statEl.textContent = `SYSTEM LOG: ${totalWrong} mistake${totalWrong !== 1 ? 's' : ''} recorded across previous levels.`;
+                }
+            }
+
+            if (cfg.autoDelay) {
+                setTimeout(proceedToGame, cfg.autoDelay);
+            } else {
+                btn.style.display = 'block';
+                btn.textContent = cfg.btnText;
+                btn.style.borderColor = cfg.color;
+                btn.style.color = cfg.color;
+                btn.onmouseover = () => {
+                    btn.style.background = cfg.color;
+                    btn.style.color = 'var(--bg-color, #02020a)';
+                };
+                btn.onmouseout = () => {
+                    btn.style.background = 'transparent';
+                    btn.style.color = cfg.color;
+                };
+                btn.onclick = proceedToGame;
+            }
+        }
+
+        // ═══ CONFIDENCE RESPONSE: CONFIG ═══
+        function getResponseConfig(val, name, totalWrong) {
+            if (val === 1) {
+                let msg;
+                if (totalWrong === 0) {
+                    msg = `${name}.\n\nYou made no mistakes in Level 1.\nThis uncertainty is new.\n\nThe system won't push you in unprepared.\nRead the reminder below before entering.`;
+                } else if (totalWrong <= 2) {
+                    msg = `Uncertainty noted, ${name}.\n\nYou've made ${totalWrong} mistake${totalWrong !== 1 ? 's' : ''} so far.\nThat is not failure.\nThat is the process.\n\nHere is what you need before entering.`;
+                } else {
+                    msg = `The system hears you, ${name}.\n\nThis has been difficult.\nThat is expected.\n\nRead what is below.\nThen enter when you are ready.`;
+                }
+                return {
+                    label: 'UNCERTAINTY_DETECTED //',
+                    message: msg,
+                    color: '#ffcc44',
+                    btnText: "I'M READY. TAKE ME IN ▶",
+                    autoDelay: 0
+                };
+            } else if (val === 2) {
+                const msgs = [
+                    `Partial confidence, ${name}.\nThat is honest.\nThe system respects honest.\n\nThe rest will come as you go.`,
+                    `Not certain. Not lost.\nThat is the right place to be.\n\nStep forward, ${name}.`,
+                    `${name}. Somewhat is enough.\nThe system does not need certainty.\nIt needs presence.\n\nYou are about to find out the rest.`
+                ];
+                return {
+                    label: 'PARTIAL_CONFIDENCE //',
+                    message: msgs[Math.floor(Math.random() * msgs.length)],
+                    color: 'var(--teal, #5DCAA5)',
+                    btnText: "LET'S DO THIS ▶",
+                    autoDelay: 0
+                };
+            } else {
+                const msgs = [
+                    `Confidence confirmed, ${name}.\nNo hesitation detected.\n\nEntering in 2 seconds...`,
+                    `Strong signal, ${name}.\nThe system is ready.\n\nInitiating now...`,
+                    `${name}. Ready.\nThe system acknowledges.\n\nBeginning sequence...`
+                ];
+                return {
+                    label: 'CONFIDENCE_CONFIRMED //',
+                    message: msgs[Math.floor(Math.random() * msgs.length)],
+                    color: 'var(--green, #00ff88)',
+                    btnText: '',
+                    autoDelay: 2000
+                };
+            }
+        }
+
+        // ═══ FIX L2-2: getLevelHint ═══
+        function getLevelHint() {
+          return `
+            <div style="color:var(--green);font-size:0.72rem;
+                        letter-spacing:0.15em;margin-bottom:0.6rem">
+              CONCEPT REMINDER
+            </div>
+            <code style="color:var(--green)">
+              print("anything")
+            </code>
+            outputs whatever is inside the quotes.<br><br>
+            The quotes themselves do not appear in the output.
+            Only what is between them.<br><br>
+            <span style="color:rgba(93,202,165,0.6)">
+              You already saw this demonstrated.<br>
+              It works exactly the same way in the puzzle.
+            </span>
+          `;
+        }
+
+        // ═══ CONFIDENCE RESPONSE: TYPEWRITER ═══
+        function typewriterCR(el, text, speed) {
+            return new Promise(resolve => {
+                el.innerHTML = '';
+                let i = 0;
+                const interval = setInterval(() => {
+                    const slice = text.slice(0, i);
+                    el.innerHTML = slice.replace(/\n/g, '<br>');
+                    i++;
+                    if (i > text.length) {
+                        clearInterval(interval);
+                        el.innerHTML = text.replace(/\n/g, '<br>');
+                        resolve();
+                    }
+                }, speed || 20);
+            });
+        }
+
+        // ═══ CONFIDENCE RESPONSE: PROCEED ═══
+        function proceedToGame() {
+            document.getElementById('confidence-response').classList.remove('active');
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const conf = state.levels?.[2]?.confidenceRating;
+            if (conf === 1) applySupportiveMode();
+            startStage2();
+        }
+
+        // ═══ CONFIDENCE RESPONSE: SUPPORT MODE ═══
+        function applySupportiveMode() {
+            const strip = document.createElement('div');
+            strip.id = 'support-strip';
+            strip.style.cssText = `
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                z-index: 800;
+                background: rgba(2,2,10,0.95);
+                border-top: 1px solid rgba(255,204,68,0.2);
+                color: rgba(255,204,68,0.6);
+                font-family: var(--font-main);
+                font-size: 0.62rem;
+                letter-spacing: 0.14em;
+                padding: 6px 1.5rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            `;
+            strip.innerHTML = `
+                <span>${getSupportStripText()}</span>
+                <span onclick="document.getElementById('support-strip').style.display='none'" style="cursor:pointer; opacity:0.4; font-size:0.7rem;">✕ DISMISS</span>
+            `;
+            document.body.appendChild(strip);
+
+            if (typeof timerInterval !== 'undefined') {
+                clearInterval(timerInterval);
+            }
+            const timerEl = document.getElementById('timer');
+            if (timerEl) timerEl.style.display = 'none';
+
+            window._supportMode = true;
+        }
+
+        function getSupportStripText() {
+            return 'SUPPORT: print("text") outputs text — quotes not included in output';
+        }
+    </script>
+</body>
+</html>

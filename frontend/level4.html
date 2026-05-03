@@ -1,0 +1,2453 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Escape Room - Level 4: Variable Updates</title>
+    <style>
+        :root {
+            --bg-color: #02020a;
+            --green: #00ff88;
+            --blue: #00d4ff;
+            --amber: #ffcc44;
+            --red: #ff4444;
+            --blue-glass: rgba(0, 212, 255, 0.1);
+            --blue-border: rgba(0, 212, 255, 0.3);
+            --font-main: 'Fira Code', 'Courier New', monospace;
+            --glow-green: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-blue: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: var(--font-main);
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-top: 2rem;
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        .recall-input {
+            background: transparent; border: 1px solid var(--green);
+            color: var(--green); font-family: var(--font-main);
+            font-size: 1.2rem; padding: 0.5rem; width: 100px;
+            text-align: center; outline: none; margin-top: 1rem;
+        }
+        .signal-bar { display: flex; gap: 4px; margin-top: 10px; justify-content: center; }
+        .sig-block { width: 15px; height: 22px; border: 1px solid rgba(0,212,255,0.2); }
+        .sig-block.active.green { background: var(--green); box-shadow: 0 0 10px var(--green); }
+        .sig-block.active.amber { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+        .sig-block.active.red   { background: var(--red); box-shadow: 0 0 10px var(--red); }
+        
+        .timer-display { position: absolute; top: 10px; right: 20px; font-family: monospace; font-size: 1.1rem; color: var(--red); letter-spacing: 1px; z-index: 10; display: none; }
+        .timer-display.visible { display: block; }
+        .timer-display.flash { animation: timerFlash 0.5s infinite; }
+        @keyframes timerFlash { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .screen { display: none; position: fixed; inset: 0; background: var(--bg-color); z-index: 500; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; text-align: center; }
+        .screen.active { display: flex; }
+        .hl { color: var(--green); text-shadow: var(--glow-green); }
+        .amb { color: var(--amber); }
+        .cod { font-family: monospace; background: rgba(0,212,255,0.1); padding: 2px 6px; }
+
+        /* Report Styles */
+        .report-card { background: rgba(4,18,44,0.9); border: 1px solid var(--blue-border); padding: 2rem; width: 95%; max-width: 800px; height: 90vh; overflow-y: auto; text-align: left; position: relative; }
+        .report-section { margin-bottom: 2rem; border-bottom: 1px solid rgba(0,212,255,0.1); padding-bottom: 1rem; }
+        .report-title { color: var(--blue); font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem; }
+
+        /* --- BACKGROUND --- */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background-image: linear-gradient(rgba(0, 212, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg) translateY(-50%);
+            animation: grid-move 20s linear infinite;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        @keyframes grid-move {
+            0% {
+                transform: perspective(500px) rotateX(60deg) translateY(-50%);
+            }
+
+            100% {
+                transform: perspective(500px) rotateX(60deg) translateY(0%);
+            }
+        }
+
+        #particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            background-color: var(--blue);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: float linear infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(110vh);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translateY(-10vh);
+                opacity: 0;
+            }
+        }
+
+        /* --- UI COMPONENTS --- */
+        #intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(2, 2, 10, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        #completion-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-color);
+            z-index: 200;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .narrative-block {
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .text-line {
+            font-size: 1.4rem;
+            margin-bottom: 0.8rem;
+            color: var(--blue);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease-out;
+        }
+
+        .text-line.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .continue-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            padding: 0.8rem 2rem;
+            font-family: var(--font-main);
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin-top: 2rem;
+            opacity: 0;
+            transition: 0.3s;
+            box-shadow: var(--glow-green);
+            display: none;
+        }
+
+        .continue-btn.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        .continue-btn:hover {
+            background: var(--green);
+            color: var(--bg-color);
+        }
+
+        /* --- GAME INTERFACE --- */
+        #game-screen {
+            display: none;
+            width: 100%;
+            min-height: 100vh;
+            flex-direction: column;
+            padding: 2rem;
+            padding-bottom: 4rem;
+            z-index: 10;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--blue-border);
+            padding-bottom: 1rem;
+        }
+
+        .level-tag {
+            color: var(--blue);
+            font-size: 1.2rem;
+            text-shadow: var(--glow-blue);
+        }
+
+        .panels-container {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 1.5rem;
+            flex-grow: 1;
+        }
+
+        .panel {
+            background: var(--blue-glass);
+            border: 1px solid var(--blue-border);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border-radius: 4px;
+        }
+
+        .panel-header {
+            background: var(--blue-border);
+            padding: 8px 15px;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* CODE PANEL */
+        .code-container {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            color: var(--green);
+        }
+
+        .code-row {
+            padding-left: 10px;
+            border-left: 3px solid transparent;
+            transition: 0.3s;
+        }
+
+        .code-row.active {
+            background: rgba(0, 255, 136, 0.1);
+            border-left-color: var(--green);
+            box-shadow: inset 5px 0 10px rgba(0, 255, 136, 0.1);
+        }
+
+        /* VISUAL PANEL */
+        .visual-stage {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            position: relative;
+        }
+
+        .variable-box {
+            width: 150px;
+            height: 150px;
+            border: 4px solid var(--blue);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            color: var(--green);
+            transition: all 0.5s;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .variable-box::before {
+            content: attr(data-label);
+            position: absolute;
+            top: -30px;
+            left: 0;
+            font-size: 1rem;
+            color: var(--blue);
+            text-transform: uppercase;
+        }
+
+        .variable-box.glow {
+            box-shadow: var(--glow-green);
+            border-color: var(--green);
+        }
+
+        .falling-value {
+            position: absolute;
+            font-size: 3rem;
+            color: var(--green);
+            text-shadow: var(--glow-green);
+            z-index: 5;
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s;
+        }
+
+        .old-value-fade {
+            position: absolute;
+            font-size: 3rem;
+            color: var(--green);
+            opacity: 1;
+            transition: opacity 0.5s, transform 0.5s;
+        }
+
+        .transformation-box {
+            position: absolute;
+            top: 20%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--blue);
+            font-size: 1.2rem;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .transformation-box.visible {
+            opacity: 1;
+        }
+
+        .output-pulse {
+            position: absolute;
+            font-size: 2.5rem;
+            color: var(--green);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @keyframes pulse-out {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        /* FLOW PANEL */
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .flow-node {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid var(--blue-border);
+            border-radius: 8px;
+            padding: 0.8rem 1.5rem;
+            color: var(--blue);
+            font-size: 0.95rem;
+            text-align: center;
+            opacity: 0.5;
+            transition: 0.3s;
+            position: relative;
+            min-width: 180px;
+        }
+
+        .flow-node.active {
+            opacity: 1;
+            border-color: var(--green);
+            color: var(--green);
+            background: rgba(0, 255, 136, 0.1);
+            box-shadow: var(--glow-green);
+            transform: scale(1.05);
+            z-index: 2;
+        }
+
+        .flow-arrow {
+            color: var(--blue-border);
+            font-size: 1.5rem;
+            margin: 0.3rem 0;
+            transition: 0.3s;
+        }
+
+        .flow-node.active+.flow-arrow {
+            color: var(--green);
+            text-shadow: var(--glow-green);
+        }
+
+        /* OUTPUT PANEL */
+        .output-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-top: 1px solid var(--blue-border);
+            padding: 1rem;
+            margin-top: 1rem;
+            min-height: 100px;
+            font-family: var(--font-main);
+            color: var(--green);
+            width: 100%;
+        }
+
+        .output-header {
+            font-size: 0.8rem;
+            color: var(--blue);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        .output-item {
+            margin: 0.2rem 0;
+            animation: slide-up 0.3s ease-out;
+        }
+
+        @keyframes slide-up {
+            from {
+                transform: translateY(10px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* CONTROLS */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            justify-content: center;
+        }
+
+        .ctrl-btn {
+            background: transparent;
+            border: 1px solid var(--blue);
+            color: var(--blue);
+            padding: 0.8rem 1.5rem;
+            cursor: pointer;
+            font-family: var(--font-main);
+            transition: 0.3s;
+        }
+
+        .ctrl-btn:hover:not(:disabled) {
+            background: var(--blue);
+            color: var(--bg-color);
+            box-shadow: var(--glow-blue);
+        }
+
+        .ctrl-btn.primary {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .ctrl-btn.primary:hover:not(:disabled) {
+            background: var(--green);
+            color: var(--bg-color);
+            box-shadow: var(--glow-green);
+        }
+
+        .ctrl-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* MODAL */
+        #modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 10, 0.9);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: var(--bg-color);
+            border: 2px solid var(--blue);
+            padding: 2.5rem;
+            max-width: 550px;
+            width: 90%;
+            text-align: center;
+            box-shadow: var(--glow-blue);
+        }
+
+        .puzzle-code {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            color: var(--green);
+            text-align: left;
+            border: 1px solid var(--blue-border);
+            border-radius: 6px;
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            line-height: 1.8;
+            box-shadow: inset 0 0 15px rgba(0, 212, 255, 0.05);
+        }
+
+        .puzzle-code-line {
+            padding-left: 10px;
+            border-left: 3px solid transparent;
+            transition: 0.3s;
+        }
+
+        .puzzle-code-line.highlight {
+            background: rgba(0, 255, 136, 0.1);
+            border-left-color: var(--green);
+            box-shadow: inset 5px 0 10px rgba(0, 255, 136, 0.1);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .option-btn {
+            background: transparent;
+            border: 1px solid var(--blue-border);
+            color: #fff;
+            padding: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .option-btn:hover {
+            border-color: var(--blue);
+            background: var(--blue-glass);
+        }
+
+        .option-btn.correct {
+            border-color: var(--green);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .option-btn.wrong {
+            border-color: #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+        }
+
+        .hint-text {
+            margin-top: 1rem;
+            color: var(--blue);
+            font-style: italic;
+            font-size: 0.9rem;
+            min-height: 1.2rem;
+        }
+
+        /* COMPLETION */
+        .points-box {
+            margin: 2rem 0;
+            padding: 1rem;
+            border: 1px dashed var(--green);
+            display: inline-block;
+        }
+
+        .point-item {
+            color: var(--green);
+            margin: 0.5rem 0;
+            font-size: 1.2rem;
+        }
+
+        /* ═══ RECALL FIX: CSS ANIMATION ═══ */
+        @keyframes recallShake {
+            0%,100% { transform: translateX(0); }
+            20%     { transform: translateX(-8px); }
+            40%     { transform: translateX(8px); }
+            60%     { transform: translateX(-5px); }
+            80%     { transform: translateX(5px); }
+        }
+
+        .recall-shake {
+            animation: recallShake 0.4s ease;
+            border-color: var(--red, #ff3355) !important;
+        }
+
+        .recall-correct {
+            border-color: var(--green, #00ff88) !important;
+            box-shadow: 0 0 12px rgba(0,255,136,0.4);
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+  <div id="progress-bar" style="
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 9999;
+    display: flex; justify-content: center;
+    align-items: center; gap: 0.6rem;
+    padding: 0.4rem 1rem;
+    background: rgba(2,2,10,0.95);
+    border-bottom: 1px solid rgba(0,255,136,0.1);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.15em;
+  ">
+    <span id="pb1">LVL 1</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb2">LVL 2</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb3">LVL 3</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pbm">MINI</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb4">LVL 4 <small onclick="replayL4Explain()" style="cursor:help; opacity:0.5">[?]</small></span>
+  </div>
+
+  <button id="skip-intro-btn" onclick="skipIntro()" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: transparent;
+    border: 1px solid rgba(0,255,136,0.3);
+    color: rgba(0,255,136,0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    padding: 6px 14px;
+    cursor: pointer;
+    z-index: 999;
+    display: none;
+  ">SKIP ▶▶</button>
+
+    <div class="scanlines"></div>
+    <div class="grid-bg"></div>
+    <div id="particles-container"></div>
+
+    <!-- ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ -->
+    <div id="worked-example-screen" class="screen">
+        <div class="panel" style="max-width:600px; width:90%;">
+            <div class="panel-header">WORKED EXAMPLE</div>
+            <div class="panel-content">
+                <div id="example-area" style="text-align: left; font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;"></div>
+                <button id="example-btn" class="continue-btn" onclick="showConfidence()">[ I UNDERSTAND ▶ ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 5: CONFIDENCE ═══ -->
+    <div id="confidence-screen" class="screen">
+        <div class="panel" style="max-width:500px; width:90%;">
+            <div class="panel-header">CONFIDENCE_CHECK</div>
+            <div class="panel-content">
+                <div style="color: var(--blue); margin-bottom: 2rem;">"Before you begin..."<br>How confident are you feeling?</div>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <button class="continue-btn visible" style="margin:0" onclick="saveConfidence(1)">1 — Not Sure</button>
+                    <button class="continue-btn visible" style="margin:0" onclick="saveConfidence(2)">2 — Somewhat</button>
+                    <button class="continue-btn visible" style="margin:0" onclick="saveConfidence(3)">3 — Ready</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ CONFIDENCE RESPONSE: HTML ═══ -->
+    <div id="confidence-response" class="screen">
+        <div class="modal-box" style="max-width: 520px; width: 92%; text-align: left;">
+            <div id="cr-label" style="font-size: 0.65rem; letter-spacing: 0.3em; margin-bottom: 1.2rem; opacity: 0.5;">SYSTEM_RESPONSE //</div>
+            <div id="cr-message" style="font-size: 1.1rem; line-height: 1.9; margin-bottom: 1.8rem; min-height: 4rem;"></div>
+            <div id="cr-hint-box" style="display: none; border: 1px dashed rgba(0,255,136,0.25); background: rgba(0,255,136,0.03); padding: 1rem 1.2rem; margin-bottom: 1.5rem; font-size: 0.82rem; line-height: 1.8; color: rgba(255,255,255,0.55);"></div>
+            <div id="cr-stat" style="display: none; font-size: 0.7rem; letter-spacing: 0.12em; margin-bottom: 1.5rem; opacity: 0.45;"></div>
+            <button id="cr-btn" style="display: none; width: 100%; background: transparent; border: 1px solid var(--green); color: var(--green); font-family: var(--font-main); font-size: 0.95rem; letter-spacing: 0.12em; padding: 0.9rem 1.5rem; cursor: pointer; transition: all 0.2s; text-align: center;"></button>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 11: TRANSFER CHALLENGE ═══ -->
+    <div id="transfer-screen" class="screen">
+        <div class="panel" style="max-width:600px; width:90%;">
+            <div class="panel-header">TRANSFER PROTOCOL // APPLY YOUR KNOWLEDGE</div>
+            <div class="panel-content">
+                <div style="margin: 1.5rem 0; font-size: 1.1rem; line-height: 1.6; text-align: left;">"A banking system has <span class="cod">balance = 500</span>. A user deposits 100. The code to update the balance is..."</div>
+                <div class="options-grid">
+                    <button class="option-btn" onclick="checkTransfer(this, false)">A) balance = 100</button>
+                    <button class="option-btn" onclick="checkTransfer(this, true)">B) balance = balance + 100</button>
+                    <button class="option-btn" onclick="checkTransfer(this, false)">C) print(600)</button>
+                    <button class="option-btn" onclick="checkTransfer(this, false)">D) balance = 600</button>
+                </div>
+                <div id="transfer-feedback" style="margin-top: 1.5rem; min-height: 30px; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- INTRO SCREEN -->
+    <div id="intro-screen">
+        <div class="narrative-block" id="intro-narrative">
+            <!-- Lines will be injected here -->
+        </div>
+        <button class="continue-btn" id="intro-continue" onclick="advanceIntro()">CONTINUE ▶</button>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen">
+        <div class="header">
+            <div class="level-tag">LEVEL 04 // VARIABLE_UPDATES</div>
+            <div class="logic-points">LOGIC_POINTS: <span id="points-display">0</span></div>
+        </div>
+
+        <div class="panels-container">
+            <!-- LEFT: CODE -->
+            <div class="panel" id="code-panel">
+                <div class="panel-header">CODE_TERMINAL</div>
+                <div class="panel-content">
+                    <div class="code-container" id="code-content">
+                        <!-- Code lines -->
+                    </div>
+                    <div id="execution-narrative"
+                        style="color: var(--blue); margin-top: 1.5rem; font-style: italic; min-height: 3rem; text-align: center;">
+                    </div>
+                    <div class="controls">
+                        <div id="timer" class="timer-display">TIME: 1:00</div>
+                        <button class="ctrl-btn primary" id="run-btn" onclick="startExecution('run')">RUN ▶</button>
+                        <button class="ctrl-btn" id="step-btn" onclick="startExecution('step')">STEP ▶</button>
+                        <button class="ctrl-btn" id="replay-btn" onclick="replayExecution()"
+                            style="display: none;">REPLAY ↺</button>
+                        <button class="ctrl-btn primary" id="next-btn" onclick="nextPuzzle()"
+                            style="display: none;">NEXT ▶</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER: VISUAL -->
+            <div class="panel" id="visual-panel">
+                <div class="panel-header">VISUAL_STATE</div>
+                <div class="panel-content" style="display: flex; flex-direction: column;">
+                    <div class="visual-stage" id="visual-stage" style="flex-grow: 1;">
+                        <div class="variable-box" id="var-box" data-label="x"></div>
+                        <div class="transformation-box" id="transformation-box">
+                            <div id="trans-line1"></div>
+                            <div id="trans-line2"></div>
+                        </div>
+                    </div>
+                    <div class="output-container" id="output-container">
+                        <div class="output-header">SYSTEM_OUTPUT:</div>
+                        <div id="output-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: FLOW -->
+            <div class="panel" id="flow-panel">
+                <div class="panel-header">LOGIC_FLOW</div>
+                <div class="panel-content" style="overflow-y: auto;">
+                    <div class="flow-diagram" id="flow-diagram">
+                        <!-- Flow nodes and arrows -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PUZZLE -->
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <h2 id="puzzle-title" style="color: var(--blue);">SYSTEM_PREDICTION</h2>
+            <p id="puzzle-desc" style="margin-top: 1rem;">What is the final value of x?</p>
+            <div class="puzzle-code" id="puzzle-code">
+                <!-- Puzzle code snippet -->
+            </div>
+            <div class="options-grid" id="options-grid">
+                <!-- Options -->
+            </div>
+            <div class="hint-text" id="hint-text"></div>
+        </div>
+    </div>
+
+    <!-- COMPLETION SCREEN -->
+    <div id="completion-screen">
+        <h1 style="color: var(--green); font-size: 3rem; text-shadow: var(--glow-green);">LEVEL 4 COMPLETE</h1>
+        <p style="color: var(--blue); margin-top: 1rem;">VARIABLE UPDATE MASTERED</p>
+        <div class="points-box">
+            <div class="point-item">+15 Logic Points</div>
+            <div class="point-item">+10 Accuracy</div>
+        </div>
+        <button class="continue-btn visible" onclick="showVictory()">FULL ESCAPE COMPLETE</button>
+    </div>
+
+    <!-- ═══ FIX 3: PERFORMANCE SCREEN ═══ -->
+    <div id="performance-screen" style="
+      display: none; position: fixed; inset: 0;
+      background: var(--bg-color); z-index: 300;
+      flex-direction: column; justify-content: center;
+      align-items: center; padding: 2rem; text-align: center;
+    ">
+      <div style="
+        background: var(--blue-glass);
+        border: 1px solid var(--blue-border);
+        padding: 2.5rem; max-width: 620px; width: 95%;
+        border-radius: 4px;
+      ">
+        <!-- Header -->
+        <div style="
+          font-size: 2rem; color: var(--green);
+          text-shadow: var(--glow-green);
+          letter-spacing: 0.2em; margin-bottom: 0.5rem;
+          font-family: var(--font-main);
+        " id="perf-header">LEVEL 4 COMPLETE</div>
+        
+        <div style="
+          color: var(--blue); font-size: 0.75rem;
+          letter-spacing: 0.3em; margin-bottom: 2rem;
+        ">VARIABLE_UPDATES // SECTOR CLEARED</div>
+
+        <!-- Stats grid -->
+        <div style="
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 1rem; margin-bottom: 2rem;
+        ">
+          <div style="
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--blue-border);
+            padding: 1rem; border-radius: 4px;
+          ">
+            <div style="
+              font-size: 0.6rem; color: rgba(255,255,255,0.4);
+              letter-spacing: 0.2em; margin-bottom: 0.4rem;
+            ">WRONG ATTEMPTS</div>
+            <div id="perf-wrong" style="
+              font-size: 1.8rem; color: var(--green);
+            ">0</div>
+          </div>
+          <div style="
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--blue-border);
+            padding: 1rem; border-radius: 4px;
+          ">
+            <div style="
+              font-size: 0.6rem; color: rgba(255,255,255,0.4);
+              letter-spacing: 0.2em; margin-bottom: 0.4rem;
+            ">CONCEPT SIGNAL</div>
+            <div id="perf-signal">—</div>
+          </div>
+          <div style="
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--blue-border);
+            padding: 1rem; border-radius: 4px;
+          ">
+            <div style="
+              font-size: 0.6rem; color: rgba(255,255,255,0.4);
+              letter-spacing: 0.2em; margin-bottom: 0.4rem;
+            ">RECALL</div>
+            <div id="perf-recall" style="font-size: 1rem;">—</div>
+          </div>
+          <div style="
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--blue-border);
+            padding: 1rem; border-radius: 4px;
+          ">
+            <div style="
+              font-size: 0.6rem; color: rgba(255,255,255,0.4);
+              letter-spacing: 0.2em; margin-bottom: 0.4rem;
+            ">RANK</div>
+            <div id="perf-rank" style="
+              font-size: 0.9rem; color: var(--blue);
+            ">—</div>
+          </div>
+        </div>
+
+        <!-- Narrative message -->
+        <div id="perf-message" style="
+          color: var(--blue); font-style: italic;
+          font-size: 0.9rem; margin-bottom: 2rem;
+          min-height: 2.5rem; letter-spacing: 0.05em;
+        "></div>
+
+        <!-- Buttons -->
+        <div style="
+          display: flex; flex-direction: column;
+          gap: 1rem; align-items: center;
+        ">
+          <button class="ctrl-btn primary" 
+                  onclick="startChallenge()"
+                  style="width: 100%; padding: 1rem;">
+            ⚡ TAKE THE CHALLENGE ▶
+          </button>
+          <button class="ctrl-btn" 
+                  onclick="goToLevel5()"
+                  style="width: 100%;">
+            SKIP CHALLENGE → LEVEL 5
+          </button>
+          <button onclick="location.href='hub.html'" style="
+            background: transparent; border: none;
+            color: rgba(0,212,255,0.3); font-size: 0.65rem;
+            font-family: var(--font-main); cursor: pointer;
+            letter-spacing: 0.1em; margin-top: 0.5rem;
+          ">↩ RETURN TO HUB</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ FIX 4: CHALLENGE SCREEN ═══ -->
+    <div id="challenge-screen" style="
+      display: none; position: fixed; inset: 0;
+      background: var(--bg-color); z-index: 400;
+      flex-direction: column; justify-content: center;
+      align-items: center; padding: 2rem;
+    ">
+      <div style="
+        background: var(--blue-glass);
+        border: 2px solid var(--green);
+        box-shadow: var(--glow-green);
+        padding: 2.5rem; max-width: 580px; width: 95%;
+        border-radius: 4px; text-align: center;
+      ">
+        <div style="
+          color: var(--green); font-size: 0.7rem;
+          letter-spacing: 0.3em; margin-bottom: 1rem;
+        ">⚡ SPEED BREACH // BONUS CHALLENGE</div>
+
+        <div style="
+          font-size: 1.1rem; color: var(--blue);
+          margin-bottom: 1.5rem;
+        ">
+          "Three updates. One variable. What survives?"
+        </div>
+
+        <!-- Timer -->
+        <div id="challenge-timer" style="
+          font-size: 2rem; color: var(--green);
+          text-shadow: var(--glow-green);
+          letter-spacing: 0.3em; margin-bottom: 1.5rem;
+          font-family: var(--font-main);
+        ">0:20</div>
+
+        <!-- Code -->
+        <div style="
+          background: rgba(0,0,0,0.6);
+          border: 1px solid var(--blue-border);
+          padding: 1.2rem; margin-bottom: 1.5rem;
+          text-align: left; border-radius: 4px;
+          font-family: var(--font-main);
+          font-size: 1.1rem; color: var(--green);
+          line-height: 1.8;
+        ">
+          x = 100<br>
+          x = x - 40<br>
+          x = x * 2<br>
+          x = x + 10<br>
+          print(x)
+        </div>
+
+        <!-- Options -->
+        <div class="options-grid" id="challenge-options">
+          <button class="option-btn" 
+                  onclick="checkChallenge(this, false, 'A')">
+            A) 60
+          </button>
+          <button class="option-btn" 
+                  onclick="checkChallenge(this, false, 'B')">
+            B) 110
+          </button>
+          <button class="option-btn" 
+                  onclick="checkChallenge(this, true, 'C')">
+            C) 130
+          </button>
+          <button class="option-btn" 
+                  onclick="checkChallenge(this, false, 'D')">
+            D) 70
+          </button>
+        </div>
+
+        <div id="challenge-feedback" style="
+          margin-top: 1rem; min-height: 1.5rem;
+          font-size: 0.85rem;
+        "></div>
+      </div>
+    </div>
+
+    <!-- VICTORY SCREEN -->
+    <div id="victory-screen" class="screen" style="z-index: 10000; background: var(--bg-color);">
+        <div class="report-card" id="victory-report">
+            <!-- Dynamic Report Sections -->
+        </div>
+        <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+            <button class="continue-btn visible" onclick="location.reload()">↺ REPLAY LEVEL 4</button>
+            <button class="continue-btn visible" onclick="location.href='hub.html'" style="border-color:var(--blue); color:var(--blue);">↩ RETURN TO HUB</button>
+            <button class="continue-btn visible" onclick="if(confirm('Reset all progress?')) { localStorage.clear(); location.href='level1.html'; }" style="border-color:rgba(255,68,68,0.4); color:rgba(255,68,68,0.6); font-size:0.7rem;">✕ RESET ALL DATA</button>
+        </div>
+    </div>
+
+    <script>
+        /* ═══ IMPROVEMENT 2: EMOTIONAL MEMORY ═══ */
+        function getEmotionalMemory() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const mini = state.levels?.mini || {};
+            const wrong = mini.mistakes || 0;
+            const name = state.playerName || "OPERATIVE";
+            if (wrong === 0) return [`You survived the Desync without a scratch, ${name}.`, "The system is impressed."];
+            return [`The Memory Leak was rough, ${name}.`, "But you're still here."];
+        }
+
+        function getName() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            return state.playerName || "OPERATIVE";
+        }
+
+        /* ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ */
+        async function showWorkedExample() {
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('worked-example-screen').classList.add('active');
+            
+            // Show button immediately for intentional navigation
+            document.getElementById('example-btn').classList.add('visible');
+
+            const area = document.getElementById('example-area');
+            const lines = [
+                { text: "Observe this update.", cls: '' },
+                { text: "z = 10", cls: 'cod hl' },
+                { text: "z = z + 5", cls: 'cod hl' },
+                { text: "z used its current value (10)...", cls: '', pause: 300 },
+                { text: "...added 5, and stored the new result: 15.", cls: '', pause: 300 },
+                { text: "Result: 15", cls: 'hl', pause: 400 },
+                { text: "Final Breach initiated.", cls: 'dim' }
+            ];
+            for(let line of lines) {
+                const div = document.createElement('div');
+                div.className = line.cls;
+                area.appendChild(div);
+                await new Promise(r => {
+                    let i=0;
+                    const inv = setInterval(() => {
+                        div.textContent = line.text.slice(0, i); i++;
+                        if(i > line.text.length) { clearInterval(inv); r(); }
+                    }, 45);
+                });
+                await new Promise(r => setTimeout(r, line.pause || 1000));
+            }
+        }
+
+        /* ═══ IMPROVEMENT 5: CONFIDENCE ═══ */
+        function showConfidence() {
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('confidence-screen').classList.add('active');
+        }
+        // ═══ CONFIDENCE RESPONSE: SAVE ═══
+        async function saveConfidence(val) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            if(!state.levels) state.levels = {};
+            if(!state.levels[4]) state.levels[4] = {};
+            state.levels[4].confidenceRating = val;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+            
+            document.getElementById('confidence-screen').classList.remove('active');
+            showConfidenceResponse(val);
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        // ═══ RECALL FIX: showRecall ═══
+        function showRecall() {
+            recallAttempts = 0;
+            const correctVal = inMiniMission ? "10"
+                             : currentPuzzleIdx === 0 ? "8"
+                             : "5";
+            const overlay = document.getElementById('modal-overlay');
+            overlay.style.display = 'flex';
+            const box = overlay.querySelector('.modal-box');
+            box.innerHTML = `
+              <h2 style="color:var(--blue);
+                         font-size:1rem;
+                         letter-spacing:0.1em;">
+                RECALL_PROTOCOL
+              </h2>
+              <p style="margin-top:0.8rem;
+                        color:rgba(255,255,255,0.6);
+                        font-size:0.88rem;">
+                Lock it in. Type the final value of 'x':
+              </p>
+              <div style="margin:1.5rem 0;">
+                <input type="text"
+                       id="recall-input"
+                       class="recall-input"
+                       autocomplete="off"
+                       onkeydown="if(event.key==='Enter')
+                                  confirmRecall('${correctVal}')">
+              </div>
+              <div id="recall-feedback"
+                   style="min-height:2.5rem;
+                          margin-bottom:1rem;
+                          font-size:0.82rem;
+                          line-height:1.6;">
+              </div>
+              <button class="continue-btn visible"
+                      style="font-size:0.9rem;"
+                      onclick="confirmRecall('${correctVal}')">
+                CONFIRM ▶
+              </button>
+            `;
+            setTimeout(() =>
+              document.getElementById('recall-input')?.focus(), 80);
+        }
+
+        // ═══ RECALL FIX: confirmRecall ═══
+        function confirmRecall(correctVal) {
+            const input    = document.getElementById('recall-input');
+            const feedback = document.getElementById('recall-feedback');
+
+            if (!input || !feedback) return;
+
+            const raw = input.value.trim();
+            const val = raw.toLowerCase();
+            const cv  = correctVal.toString().toLowerCase();
+
+            // ── EMPTY INPUT ───────────────────────────────────
+            if (raw === '') {
+                feedback.innerHTML =
+                    '<span style="color:var(--red,#ff3355)">' +
+                    'The system requires an answer.' +
+                    '</span>';
+                input.focus();
+                return; // do not count as attempt
+            }
+
+            // ── CORRECT ───────────────────────────────────────
+            if (val === cv) {
+                input.classList.remove('recall-shake');
+                input.classList.add('recall-correct');
+                feedback.innerHTML =
+                    '<span style="color:var(--green,#00ff88)">' +
+                    `Confirmed. ${correctVal} locked in. ✓` +
+                    '</span>';
+
+                // Save correct recall
+                const state = JSON.parse(
+                    localStorage.getItem('cer_state') || '{}'
+                );
+                if (!state.levels) state.levels = {};
+                if (!state.levels[4])
+                    state.levels[4] = {};
+                state.levels[4].typedRecall = true;
+                localStorage.setItem(
+                    'cer_state', JSON.stringify(state)
+                );
+
+                setTimeout(proceedAfterRecall, 800);
+                return;
+            }
+
+            // ── WRONG ─────────────────────────────────────────
+            recallAttempts++;
+
+            // Shake animation
+            input.classList.remove('recall-shake');
+            void input.offsetWidth; // force reflow
+            input.classList.add('recall-shake');
+            setTimeout(() =>
+                input.classList.remove('recall-shake'), 450);
+
+            if (recallAttempts >= 3) {
+                // Max attempts — show answer and move on
+                feedback.innerHTML =
+                    '<span style="color:var(--amber,#ffcc44)">' +
+                    `The system accepts your effort.<br>` +
+                    `Answer was: <strong style="color:var(--green)">` +
+                    `${correctVal}</strong>. Remember it.` +
+                    '</span>';
+
+                // Save failed recall
+                const state = JSON.parse(
+                    localStorage.getItem('cer_state') || '{}'
+                );
+                if (!state.levels) state.levels = {};
+                if (!state.levels[4])
+                    state.levels[4] = {};
+                state.levels[4].typedRecall = false;
+                localStorage.setItem(
+                    'cer_state', JSON.stringify(state)
+                );
+
+                // Disable input and button
+                input.disabled = true;
+                const btn = document.querySelector(
+                    '#modal-overlay .run-btn, ' +
+                    '#modal-overlay .continue-btn'
+                );
+                if (btn) btn.disabled = true;
+
+                setTimeout(proceedAfterRecall, 2200);
+
+            } else {
+                // Still has attempts left
+                const remaining = 3 - recallAttempts;
+                const hint = recallAttempts === 1
+                    ? `Not quite. The answer was: ` +
+                    `<strong style="color:var(--green)">` +
+                    `${correctVal}</strong>.<br>` +
+                    `Try typing it exactly, then confirm.`
+                    : `Still incorrect. ` +
+                    `Answer: <strong style="color:var(--green)">` +
+                    `${correctVal}</strong>.<br>` +
+                    `${remaining} attempt${remaining !== 1 ? 's' : ''} ` +
+                    `remaining — type it in.`;
+
+                feedback.innerHTML =
+                    `<span style="color:var(--amber,#ffcc44)">` +
+                    `${hint}</span>`;
+
+                // Clear and refocus
+                input.value = '';
+                setTimeout(() => input.focus(), 100);
+            }
+        }
+
+        // ═══ RECALL FIX: proceedAfterRecall ═══
+        function proceedAfterRecall() {
+            if (inMiniMission) {
+                showPerformanceScreen();
+            } else {
+                nextPuzzle();
+            }
+        }
+
+        function saveSignal(time) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const wrongCount = state.levels?.[4]?.wrongAttempts || 0;
+            const validTime = isNaN(time) ? 20000 : time;
+            let signal;
+            if (wrongCount === 0 && validTime < 15000) signal = 'STRONG';
+            else if (wrongCount === 0) signal = 'GOOD';
+            else if (wrongCount <= 2) signal = 'MODERATE';
+            else signal = 'WEAK';
+            
+            if(!state.levels) state.levels = {};
+            if(!state.levels[4]) state.levels[4] = {};
+            state.levels[4].signal = signal;
+            state.levels[4].responseTime = validTime;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+        }
+
+        function getSignalHTML(signal) {
+            const map = { 'STRONG': 5, 'GOOD': 4, 'MODERATE': 3, 'WEAK': 2 };
+            const count = map[signal] || 0;
+            const color = count >= 4 ? 'green' : (count === 3 ? 'amber' : 'red');
+            let html = `<div class="signal-bar">`;
+            for(let i=1; i<=5; i++) {
+                html += `<div class="sig-block ${i<=count ? 'active ' + color : ''}"></div>`;
+            }
+            html += ` <span style="margin-left:8px; font-size:0.7rem; color:var(--${color === 'green' ? 'green' : color})">${signal}</span></div>`;
+            return html;
+        }
+
+        /* ═══ IMPROVEMENT 7: ADAPTIVE DIFFICULTY ═══ */
+        let timerInterval;
+        function applyDifficulty() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const diff = state.difficulty || 'normal';
+            if (diff === 'easy') {
+                document.getElementById('puzzle-desc').innerHTML += `<br><span style="color:var(--blue); opacity:0.6; font-size:0.8rem;">HINT: The latest assignment always wins.</span>`;
+            } else if (diff === 'hard') {
+                startTimer(60);
+            }
+        }
+
+        function startTimer(seconds) {
+            const el = document.getElementById('timer');
+            el.classList.add('visible');
+            let left = seconds;
+            timerInterval = setInterval(() => {
+                left--;
+                const m = Math.floor(left/60);
+                const s = left%60;
+                el.textContent = `TIME: ${m}:${s < 10 ? '0' + s : s}`;
+                if(left <= 20) el.style.color = 'var(--amber)';
+                if(left <= 10) { el.style.color = 'var(--red)'; el.classList.add('flash'); }
+                if(left <= 0) {
+                    clearInterval(timerInterval);
+                    alert("TIME EXPIRED. Resetting Breach...");
+                    location.reload();
+                }
+            }, 1000);
+        }
+
+        /* ═══ IMPROVEMENT 8: REPLAY ═══ */
+        function replayL4Explain() { window.location.reload(); }
+
+        /* ═══ IMPROVEMENT 9: GHOST STATS ═══ */
+        function showGhostStats(correct) {
+            const seed = (4 * 1337 + 1 * 42);
+            const pct  = 45 + (seed % 38);
+            const avg  = 1 + (seed % 3);
+            const fb = document.getElementById('execution-narrative');
+            const stats = document.createElement('div');
+            stats.style.cssText = 'color: rgba(0,212,255,0.3); font-size: 0.68rem; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.9s;';
+            stats.textContent = correct 
+                ? `${pct}% of operatives solved this first try.` 
+                : `You're not alone — ${100-pct}% also struggled here. Average attempts: ${avg}`;
+            fb.appendChild(stats);
+            setTimeout(() => stats.style.opacity = '1', 900);
+        }
+
+        /* ═══ IMPROVEMENT 11: TRANSFER CHALLENGE ═══ */
+        // startTransfer removed in FIX 5 flow update
+        function checkTransfer(btn, isCorrect) {
+            const fb = document.getElementById('transfer-feedback');
+            if(isCorrect) {
+                btn.style.borderColor = 'var(--green)';
+                fb.innerHTML = '<span style="color: var(--green)">Transfer complete. Concept secured.</span>';
+                setTimeout(() => {
+                    document.getElementById('transfer-screen').classList.remove('active');
+                    showPerformanceScreen();
+                }, 1500);
+            } else {
+                btn.style.borderColor = 'var(--red)';
+                fb.innerHTML = '<span style="color: var(--amber)">Same logic as before. Think back.</span>';
+                setTimeout(() => {
+                    document.getElementById('transfer-screen').classList.remove('active');
+                    showPerformanceScreen();
+                }, 1500);
+            }
+        }
+
+        // --- DATA ---
+        const introStages = [
+            ["Variables are not fixed boxes.", "They can change as the program runs."],
+            ["A new value can replace an old one.", "We call this 'overwriting'."],
+            ["A variable can even update using itself.", "Let's master the flow."]
+        ];
+
+        const puzzles = [
+            {
+                code: "x = 5\nx = 8\nprint(x)",
+                targetLines: [1],
+                options: ["5", "8", "x", "Error"],
+                correct: 1,
+                hints: [
+                    "The latest value replaces the previous one.",
+                    "Look at the second line: x = 8.",
+                    "x is updated to 8 before printing."
+                ]
+            },
+            {
+                code: "x = 2\nx = x + 3\nprint(x)",
+                targetLines: [1],
+                options: ["2", "3", "5", "x3"],
+                correct: 2,
+                hints: [
+                    "x uses its current value (2) to update.",
+                    "x = 2 + 3",
+                    "The new value becomes 5."
+                ]
+            }
+        ];
+
+        const levelSequences = [
+            [
+                { codeRow: 0, type: 'assign', var: 'x', val: 5, flow: 'Create x' },
+                { codeRow: 0, type: 'assign_val', var: 'x', val: 5, flow: 'Store 5 in x' },
+                { codeRow: 1, type: 'update_val', var: 'x', val: 8, flow: 'Update x → 8' },
+                { codeRow: 2, type: 'print', var: 'x', val: 8, flow: 'Print x → 8' }
+            ],
+            [
+                { codeRow: 0, type: 'assign', var: 'x', val: 2, flow: 'Create x' },
+                { codeRow: 0, type: 'assign_val', var: 'x', val: 2, flow: 'Store 2 in x' },
+                { codeRow: 1, type: 'self_update', var: 'x', val: 5, oldVal: 2, transform: '2 + 3', flow: 'Update x → 5' },
+                { codeRow: 2, type: 'print', var: 'x', val: 5, flow: 'Print x → 5' }
+            ]
+        ];
+
+        // ═══ FIX 2: MINI MISSION PUZZLE ═══
+        const miniMissionPuzzle = {
+            title:   "MINI_MISSION: CHAIN_REACTION",
+            code:    "x = 3\nx = x * 2\nx = x + 4\nprint(x)",
+            options: ["6", "10", "7", "14"],  // A B C D
+            correct: 1,  // B) 10  (3*2=6, 6+4=10)
+            targetLines: [1, 2],
+            hints: [
+                "x = 3 → x = 3*2 = 6 → x = 6+4 = 10.",
+                "Each line updates x using its current value.",
+                "Follow the chain: 3 → 6 → 10."
+            ],
+            wrongReasons: {
+                "6":  "That's after the first update only. There's a second update: x = x + 4.",
+                "7":  "Check the operators. It's multiply then add, not add then multiply.",
+                "14": "That's 3+4+7 thinking. Start with x=3, multiply by 2, then add 4."
+            }
+        };
+
+        let currentPuzzleIdx = 0;
+        let currentStepIdx   = 0;
+        let currentIntroStage = 0;
+        let points = 0;
+        let attempts = 0;
+        let executionMode = 'run';
+        let isExecuting = false;
+        let puzzleStartTime;
+        let inMiniMission = false; // ═══ FIX 1: RECALL CRASH FLAG ═══
+        // ═══ RECALL FIX: recallAttempts COUNTER ═══
+        let recallAttempts = 0;
+
+        // --- INITIALIZATION ---
+        // ═══ FIX L4-4: window.onload → DOMContentLoaded ═══
+        document.addEventListener('DOMContentLoaded', () => {
+            const mem = getEmotionalMemory();
+            introStages[0].unshift(...mem);
+
+            // ═══ FIX L4-3: cssText WIPES PROGRESS BAR ═══
+            document.getElementById('pb4').style.color = '#00ff88';
+            document.getElementById('pb4').style.textShadow = '0 0 8px #00ff88';
+
+            (function markCompleted() {
+              const state = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+              );
+              const map = {
+                pb1: state.levels?.[1]?.completed,
+                pb2: state.levels?.[2]?.completed,
+                pb3: state.levels?.[3]?.completed,
+                pbm: state.levels?.mini?.completed,
+                pb4: state.levels?.[4]?.completed
+              };
+              Object.entries(map).forEach(([id, done]) => {
+                if (done) {
+                  const el = document.getElementById(id);
+                  if (el) el.textContent = el.textContent + ' ✓';
+                }
+              });
+            })();
+
+            createParticles();
+
+            // Lazy particles
+            document.addEventListener('click', lazyParticles, { once: true });
+            setTimeout(lazyParticles, 3000);
+
+            // ═══ FIX L4-2: game-screen SHOWN BEFORE INTRO ═══
+            showIntroStage(0);
+        });
+
+        function createParticles() {
+            const container = document.getElementById('particles-container');
+            for (let i = 0; i < 30; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = Math.random() * 3 + 2;
+                p.style.width = `${size}px`;
+                p.style.height = `${size}px`;
+                p.style.left = `${Math.random() * 100}vw`;
+                p.style.animationDuration = `${Math.random() * 10 + 10}s`;
+                p.style.animationDelay = `${Math.random() * 5}s`;
+                container.appendChild(p);
+            }
+        }
+
+        let particlesCreated = false;
+        function lazyParticles() {
+            if (!particlesCreated) {
+                createParticles();
+                particlesCreated = true;
+            }
+        }
+
+        function skipIntro() {
+            // Fill all intro text instantly, advance to puzzle
+            currentIntroStage = introStages.length;
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('confidence-screen').classList.remove('active');
+            document.getElementById('game-screen').style.display = 'flex';
+            document.getElementById('skip-intro-btn').style.display = 'none';
+            lazyParticles();
+            setupPuzzleBackground();
+            startLevel();
+        }
+
+        // --- INTRO LOGIC ---
+        async function showIntroStage(idx) {
+            const container = document.getElementById('intro-narrative');
+            const btn = document.getElementById('intro-continue');
+            container.innerHTML = '';
+            btn.classList.remove('visible');
+
+            const lines = introStages[idx];
+            for (let line of lines) {
+                const el = document.createElement('div');
+                el.className = 'text-line';
+                let text = line.replace('{name}', getName());
+                container.appendChild(el);
+                await typeText(el, text);
+                el.classList.add('visible');
+                await new Promise(r => setTimeout(r, 1200));
+            }
+            btn.classList.add('visible');
+            document.getElementById('skip-intro-btn').style.display = 'block';
+        }
+
+        function typeText(el, text) {
+            return new Promise(resolve => {
+                let i = 0;
+                const interval = setInterval(() => {
+                    el.textContent = text.slice(0, i) + (i < text.length ? '_' : '');
+                    i++;
+                    if (i > text.length) {
+                        clearInterval(interval);
+                        el.textContent = text;
+                        resolve();
+                    }
+                }, 35);
+
+                const skipHandler = () => {
+                    clearInterval(interval);
+                    el.textContent = text;
+                    document.body.removeEventListener('click', skipHandler);
+                    document.body.removeEventListener('touchstart', skipHandler);
+                    resolve();
+                };
+                document.body.addEventListener('click', skipHandler);
+                document.body.addEventListener('touchstart', skipHandler);
+            });
+        }
+
+        function advanceIntro() {
+            currentIntroStage++;
+            if (currentIntroStage < introStages.length) {
+                showIntroStage(currentIntroStage);
+            } else {
+                showWorkedExample();
+            }
+        }
+
+        // --- LEVEL LOGIC ---
+        function startLevel() {
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('skip-intro-btn').style.display = 'none';
+            setupPuzzleModal();
+        }
+
+        function setupPuzzleBackground() {
+            const puzzle = puzzles[currentPuzzleIdx];
+
+            const mainCode = document.getElementById('code-content');
+            mainCode.innerHTML = puzzle.code.split('\n').map(line => `<div class="code-row">${line}</div>`).join('');
+
+            const flowDiagram = document.getElementById('flow-diagram');
+            flowDiagram.innerHTML = '';
+
+            flowDiagram.innerHTML += '<div class="flow-node" id="node-start">Start</div>';
+
+            levelSequences[currentPuzzleIdx].forEach((step, idx) => {
+                flowDiagram.innerHTML += '<div class="flow-arrow">↓</div>';
+                flowDiagram.innerHTML += `<div class="flow-node" id="node-${idx}">${step.flow}</div>`;
+            });
+
+            flowDiagram.innerHTML += '<div class="flow-arrow">↓</div>';
+            flowDiagram.innerHTML += `<div class="flow-node" id="node-end">End</div>`;
+
+            document.getElementById('node-start').classList.add('active');
+
+            document.getElementById('var-box').textContent = '';
+            document.getElementById('var-box').classList.remove('glow');
+            document.getElementById('output-list').innerHTML = '';
+            document.getElementById('transformation-box').classList.remove('visible');
+        }
+
+        function setupPuzzleModal() {
+            const puzzle = puzzles[currentPuzzleIdx];
+            const overlay = document.getElementById('modal-overlay');
+            const codeEl = document.getElementById('puzzle-code');
+            const optionsEl = document.getElementById('options-grid');
+            const hintEl = document.getElementById('hint-text');
+
+            codeEl.innerHTML = puzzle.code.split('\n').map((line, idx) => `<div class="puzzle-code-line" data-line="${idx}">${line}</div>`).join('');
+            optionsEl.innerHTML = '';
+            hintEl.textContent = '';
+            attempts = 0;
+            puzzleStartTime = Date.now();
+
+            puzzle.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => checkAnswer(idx);
+                
+                // Add hover effect linkage
+                btn.onmouseenter = () => {
+                    puzzle.targetLines.forEach(lineIdx => {
+                        const lineEl = codeEl.querySelectorAll('.puzzle-code-line')[lineIdx];
+                        if (lineEl) lineEl.classList.add('highlight');
+                    });
+                };
+                btn.onmouseleave = () => {
+                    puzzle.targetLines.forEach(lineIdx => {
+                        const lineEl = codeEl.querySelectorAll('.puzzle-code-line')[lineIdx];
+                        if (lineEl) lineEl.classList.remove('highlight');
+                    });
+                };
+                optionsEl.appendChild(btn);
+            });
+
+            overlay.style.display = 'flex';
+        }
+
+        function checkAnswer(idx) {
+            const puzzle = puzzles[currentPuzzleIdx];
+            const btns = document.getElementById('options-grid').children;
+            const hintEl = document.getElementById('hint-text');
+            const userAnswer = puzzle.options[idx];
+
+            if (idx === puzzle.correct) {
+                btns[idx].classList.add('correct');
+                hintEl.textContent = "Correct! Watch the execution...";
+                points += 5;
+                updatePoints();
+                setTimeout(() => {
+                    document.getElementById('modal-overlay').style.display = 'none';
+                    document.getElementById('execution-narrative').textContent = "Click RUN to watch the code execute step by step.";
+                    enableControls();
+                }, 1500);
+            } else {
+                btns[idx].classList.add('wrong');
+                attempts++;
+                
+                // ═══ CONFIDENCE RESPONSE: AUTO-HINT ═══
+                const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+                const wrongCount = (state.levels?.[4]?.wrongAttempts || 0) + 1; // current attempt
+                if (window._supportMode && wrongCount === 1) {
+                    if (hintEl) {
+                        hintEl.textContent = puzzle.hints?.[0] || 'The latest assignment replaces the old one.';
+                        hintEl.style.color = '#ffcc44';
+                    }
+                }
+
+                showMistakeFeedback(userAnswer, puzzle);
+            }
+        }
+
+        function showMistakeFeedback(userAnswer, puzzle) {
+            const title = document.getElementById('puzzle-title');
+            const desc = document.getElementById('puzzle-desc');
+            const codeEl = document.getElementById('puzzle-code');
+            const optionsEl = document.getElementById('options-grid');
+            const hintEl = document.getElementById('hint-text');
+
+            title.textContent = "SYSTEM_ERROR";
+            title.style.color = "#ff4444";
+
+            desc.innerHTML = `You expected: <span style="color:#ff4444">${userAnswer}</span><br><br>Actual result:<br><span style="color:var(--green)">> ${puzzle.options[puzzle.correct]}</span>`;
+
+            codeEl.style.display = 'none';
+            optionsEl.innerHTML = '';
+
+            hintEl.innerHTML = currentPuzzleIdx === 0 ? "The latest value replaces the old one." : "x was updated using its previous value.";
+            hintEl.style.color = "var(--blue)";
+
+            const ackBtn = document.createElement('button');
+            ackBtn.className = 'option-btn wrong';
+            ackBtn.textContent = "ACKNOWLEDGE ▶";
+            ackBtn.style.gridColumn = "span 2";
+            ackBtn.onclick = () => {
+                document.getElementById('modal-overlay').style.display = 'none';
+                title.textContent = "SYSTEM_PREDICTION";
+                title.style.color = "var(--blue)";
+                desc.textContent = "What is the final value of x?";
+                codeEl.style.display = 'block';
+                enableControls();
+            };
+            optionsEl.appendChild(ackBtn);
+        }
+
+        function enableControls() {
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('step-btn').disabled = false;
+            currentStepIdx = 0;
+        }
+
+        async function startExecution(mode) {
+            if (isExecuting) return;
+            isExecuting = true;
+            executionMode = mode;
+
+            document.getElementById('run-btn').disabled = true;
+            document.getElementById('step-btn').disabled = (mode === 'run');
+
+            if (mode === 'run') {
+                while (currentStepIdx < levelSequences[currentPuzzleIdx].length) {
+                    await executeStep();
+                    // ═══ FIX 7: EXECUTION PACE ═══
+                    await new Promise(r => setTimeout(r, 900));
+                }
+                finishSequence();
+            } else {
+                await executeStep();
+                if (currentStepIdx >= levelSequences[currentPuzzleIdx].length) {
+                    finishSequence();
+                } else {
+                    isExecuting = false;
+                }
+            }
+        }
+
+        async function executeStep() {
+            const seq = levelSequences[currentPuzzleIdx];
+            const step = seq[currentStepIdx];
+
+            const rows = document.getElementById('code-content').children;
+            for (let r of rows) r.classList.remove('active');
+            if (rows[step.codeRow]) rows[step.codeRow].classList.add('active');
+
+            const flowNodes = document.querySelectorAll('.flow-node');
+            flowNodes.forEach(n => n.classList.remove('active'));
+            const currentNode = document.getElementById(`node-${currentStepIdx}`);
+            if (currentNode) currentNode.classList.add('active');
+
+            const narr = document.getElementById('execution-narrative');
+
+            // ═══ FIX 7: EXECUTION PACE & NARRATIVE ═══
+            if (step.type === 'assign') {
+                narr.textContent = `Creating variable '${step.var}'...`;
+                await new Promise(r => setTimeout(r, 800));
+            } else if (step.type === 'assign_val') {
+                narr.textContent = `Storing ${step.val} in '${step.var}'.`;
+                await animateAssignment(step.var, step.val);
+            } else if (step.type === 'update_val') {
+                narr.textContent = `'${step.var}' is overwritten → new value: ${step.val}`;
+                await animateUpdate(step.var, step.val);
+            } else if (step.type === 'self_update') {
+                narr.textContent = `'${step.var}' reads itself (${step.oldVal}), computes ${step.transform} → stores ${step.val}`;
+                await animateSelfUpdate(step.var, step.val, step.oldVal, step.transform);
+            } else if (step.type === 'print') {
+                narr.textContent = `print() displays current value of '${step.var}': ${step.val}`;
+                await animatePrint(step.var, step.val);
+            }
+
+            currentStepIdx++;
+        }
+
+        function animateAssignment(variable, value) {
+            return new Promise(resolve => {
+                const stage = document.getElementById('visual-stage');
+                const box = document.getElementById('var-box');
+                const valEl = document.createElement('div');
+                valEl.className = 'falling-value';
+                valEl.textContent = value;
+                valEl.style.top = '-100px';
+                stage.appendChild(valEl);
+
+                setTimeout(() => {
+                    valEl.style.transform = 'translateY(100px)';
+                    setTimeout(() => {
+                        valEl.style.opacity = '0';
+                        box.textContent = value;
+                        box.classList.add('glow');
+                        setTimeout(() => {
+                            valEl.remove();
+                            resolve();
+                        }, 500);
+                    }, 1000);
+                }, 50);
+            });
+        }
+
+        function animateUpdate(variable, value) {
+            return new Promise(resolve => {
+                const stage = document.getElementById('visual-stage');
+                const box = document.getElementById('var-box');
+                
+                // Old value fade
+                const oldVal = box.textContent;
+                const fadeEl = document.createElement('div');
+                fadeEl.className = 'old-value-fade';
+                fadeEl.textContent = oldVal;
+                box.appendChild(fadeEl);
+                box.textContent = '';
+
+                setTimeout(() => {
+                    fadeEl.style.opacity = '0';
+                    fadeEl.style.transform = 'scale(0.5)';
+                    
+                    // New value falling
+                    const valEl = document.createElement('div');
+                    valEl.className = 'falling-value';
+                    valEl.textContent = value;
+                    valEl.style.top = '-100px';
+                    stage.appendChild(valEl);
+
+                    setTimeout(() => {
+                        valEl.style.transform = 'translateY(100px)';
+                        setTimeout(() => {
+                            valEl.style.opacity = '0';
+                            box.textContent = value;
+                            box.classList.add('glow');
+                            // Brief extra glow
+                            box.style.boxShadow = '0 0 40px var(--green)';
+                            setTimeout(() => {
+                                box.style.boxShadow = '';
+                                valEl.remove();
+                                fadeEl.remove();
+                                resolve();
+                            }, 500);
+                        }, 1000);
+                    }, 50);
+                }, 100);
+            });
+        }
+
+        function animateSelfUpdate(variable, newVal, oldVal, transform) {
+            return new Promise(resolve => {
+                const transBox = document.getElementById('transformation-box');
+                const line1 = document.getElementById('trans-line1');
+                const line2 = document.getElementById('trans-line2');
+                const box = document.getElementById('var-box');
+
+                line1.textContent = `Current: ${oldVal}`;
+                line2.textContent = `Process: ${transform}`;
+                transBox.classList.add('visible');
+
+                setTimeout(async () => {
+                    transBox.classList.remove('visible');
+                    await new Promise(r => setTimeout(r, 400));
+                    await animateUpdate(variable, newVal);
+                    resolve();
+                }, 2500);
+            });
+        }
+
+        function animatePrint(variable, value) {
+            return new Promise(resolve => {
+                const box = document.getElementById('var-box');
+                const pulse = document.createElement('div');
+                pulse.className = 'output-pulse';
+                pulse.textContent = value;
+                box.appendChild(pulse);
+
+                pulse.style.animation = 'pulse-out 0.8s ease-out forwards';
+
+                setTimeout(() => {
+                    pulse.remove();
+                    const outList = document.getElementById('output-list');
+                    const item = document.createElement('div');
+                    item.className = 'output-item';
+                    item.textContent = `> ${value}`;
+                    outList.appendChild(item);
+                    resolve();
+                }, 800);
+            });
+        }
+
+        function finishSequence() {
+            isExecuting = false;
+            document.getElementById('run-btn').style.display = 'none';
+            document.getElementById('step-btn').style.display = 'none';
+
+            document.getElementById('replay-btn').style.display = 'block';
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.style.display = 'block';
+
+            // ═══ FIX 5: WIRE THE COMPLETE FLOW ═══
+            if (currentPuzzleIdx === 0) {
+                nextBtn.onclick = () => showRecall();
+            } else {
+                nextBtn.onclick = () => startMiniMission();
+            }
+
+            const narr = document.getElementById('execution-narrative');
+            narr.innerHTML = currentPuzzleIdx === 0 ? "The latest value replaces the previous one." : "x uses its current value to become something new.";
+
+            const flowNodes = document.querySelectorAll('.flow-node');
+            flowNodes.forEach(n => n.classList.remove('active'));
+            const endNode = document.getElementById('node-end');
+            if (endNode) endNode.classList.add('active');
+        }
+
+        function replayExecution() {
+            const rows = document.getElementById('code-content').children;
+            for (let r of rows) r.classList.remove('active');
+            const flowNodes = document.querySelectorAll('.flow-node');
+            flowNodes.forEach(n => n.classList.remove('active'));
+            document.getElementById('node-start').classList.add('active');
+            document.getElementById('output-list').innerHTML = '';
+            document.getElementById('var-box').textContent = '';
+            document.getElementById('var-box').classList.remove('glow');
+            document.getElementById('replay-btn').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('run-btn').style.display = 'block';
+            document.getElementById('step-btn').style.display = 'block';
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('step-btn').disabled = false;
+            document.getElementById('execution-narrative').innerHTML = '';
+            currentStepIdx = 0;
+            startExecution('run');
+        }
+
+        function nextPuzzle() {
+            currentPuzzleIdx++;
+            document.getElementById('replay-btn').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('run-btn').style.display = 'block';
+            document.getElementById('step-btn').style.display = 'block';
+            document.getElementById('execution-narrative').innerHTML = '';
+            const title = document.getElementById('puzzle-title');
+            title.textContent = "SYSTEM_PREDICTION";
+            title.style.color = "var(--blue)";
+            document.getElementById('puzzle-desc').textContent = "What is the final value of x?";
+            document.getElementById('puzzle-code').style.display = 'block';
+            setupPuzzleBackground();
+            setupPuzzleModal();
+        }
+
+        // ═══ FIX 2: MINI MISSION PUZZLE ═══
+        function startMiniMission() {
+            inMiniMission = true;
+            puzzleStartTime = Date.now();
+            const modal = document.getElementById('modal-overlay');
+            const title = document.getElementById('puzzle-title');
+            const desc = document.getElementById('puzzle-desc');
+            const codeEl = document.getElementById('puzzle-code');
+            const optionsEl = document.getElementById('options-grid');
+            const hintEl = document.getElementById('hint-text');
+
+            title.textContent = miniMissionPuzzle.title;
+            title.style.color = "var(--green)";
+            desc.innerHTML = "The system allows changes... can you control them?<br><br>Task: What will the system display?";
+            
+            codeEl.innerHTML = '';
+            codeEl.style.display = "block";
+            optionsEl.innerHTML = '';
+            hintEl.textContent = '';
+
+            const lines = miniMissionPuzzle.code.split('\n');
+            lines.forEach((line, idx) => {
+                const div = document.createElement('div');
+                div.className = 'puzzle-code-line';
+                div.textContent = line;
+                if (miniMissionPuzzle.targetLines.includes(idx)) div.classList.add('highlight');
+                codeEl.appendChild(div);
+            });
+
+            miniMissionPuzzle.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => {
+                    if (idx === miniMissionPuzzle.correct) {
+                        btn.classList.add('correct');
+                        optionsEl.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+                        hintEl.style.color = 'var(--green)';
+                        hintEl.textContent = "Chain complete. All updates tracked.";
+                        saveSignal(Date.now() - puzzleStartTime);
+                        showGhostStats(true);
+                        setTimeout(showRecall, 1200);
+                    } else {
+                        btn.classList.add('wrong');
+                        showGhostStats(false);
+                        
+                        // ═══ CONFIDENCE RESPONSE: AUTO-HINT (MINI) ═══
+                        const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+                        const wrongCount = (state.levels?.[4]?.wrongAttempts || 0) + 1;
+                        if (window._supportMode && wrongCount === 1) {
+                            hintEl.style.color = '#ffcc44';
+                            hintEl.textContent = miniMissionPuzzle.hints?.[0] || 'Chain the updates step by step.';
+                        } else {
+                            hintEl.style.color = 'var(--amber)';
+                            hintEl.textContent = miniMissionPuzzle.wrongReasons[opt] || miniMissionPuzzle.hints[0];
+                        }
+                        
+                        if(!state.levels) state.levels = {};
+                        if(!state.levels[4]) state.levels[4] = {};
+                        state.levels[4].wrongAttempts = wrongCount;
+                        localStorage.setItem('cer_state', JSON.stringify(state));
+                        
+                        setTimeout(() => {
+                            btn.classList.remove('wrong');
+                            btn.disabled = false;
+                        }, 1800);
+                    }
+                };
+                optionsEl.appendChild(btn);
+            });
+
+            modal.style.display = 'flex';
+        }
+
+        // ═══ FIX 3: PERFORMANCE SCREEN ═══
+        function showPerformanceScreen() {
+            const state = JSON.parse(
+              localStorage.getItem('cer_state') || '{}'
+            );
+
+            // Save completion
+            if(!state.levels) state.levels = {};
+            if(!state.levels[4]) state.levels[4] = {};
+            state.levels[4].completed   = true;
+            state.levels[4].completedAt = Date.now();
+            state.currentLevel = 5;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+
+            // Clear all active screens
+            document.getElementById('modal-overlay').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('transfer-screen').classList.remove('active');
+            document.getElementById('completion-screen').style.display = 'none';
+
+            // Populate stats
+            const wrong  = state.levels[4]?.wrongAttempts || 0;
+            const signal = state.levels[4]?.signal || 'MODERATE';
+            const recall = state.levels[4]?.typedRecall;
+
+            document.getElementById('perf-wrong').textContent = wrong;
+            document.getElementById('perf-signal').innerHTML = getSignalHTML(signal);
+            document.getElementById('perf-recall').textContent = 
+              recall === true  ? '✓ CONFIRMED' :
+              recall === false ? '✗ HESITATED' : '— SKIPPED';
+            document.getElementById('perf-recall').style.color = 
+              recall === true ? 'var(--green)' : 'var(--amber)';
+
+            // Rank
+            const rank = wrong === 0 ? 'GRANDMASTER' :
+                         wrong <= 2  ? 'ARCHITECT'   :
+                         wrong <= 5  ? 'OPERATIVE'   : 'APPRENTICE';
+            document.getElementById('perf-rank').textContent = rank;
+
+            // Narrative message based on performance
+            const msgs = {
+              0: "No mistakes. The system is unsettled by your precision.",
+              1: "One slip. The machine noticed. But you recovered.",
+              2: "Two hesitations. Expected. Not unforgivable.",
+            };
+            const msg = msgs[wrong] || `${wrong} attempts. The system has learned your patterns.`;
+            
+            // Typewriter effect for message
+            const msgEl = document.getElementById('perf-message');
+            msgEl.textContent = '';
+            let i = 0;
+            const iv = setInterval(() => {
+              msgEl.textContent = msg.slice(0, i) + (i < msg.length ? '_' : '');
+              i++;
+              if(i > msg.length) {
+                clearInterval(iv);
+                msgEl.textContent = msg;
+              }
+            }, 22);
+
+            // Show screen
+            document.getElementById('performance-screen').style.display = 'flex';
+        }
+
+        // ═══ FIX 4: CHALLENGE SCREEN ═══
+        let challengeTimer;
+        let challengeTimeLeft = 20;
+
+        function startChallenge() {
+            document.getElementById('performance-screen').style.display = 'none';
+            document.getElementById('challenge-screen').style.display = 'flex';
+            challengeTimeLeft = 20;
+            startChallengeTimer();
+        }
+
+        function startChallengeTimer() {
+            clearInterval(challengeTimer);
+            challengeTimer = setInterval(() => {
+                challengeTimeLeft--;
+                const el = document.getElementById('challenge-timer');
+                el.textContent = '0:' + (challengeTimeLeft < 10 ? '0' : '') + challengeTimeLeft;
+                
+                if(challengeTimeLeft <= 10) el.style.color = 'var(--amber)';
+                if(challengeTimeLeft <= 5) {
+                    el.style.color = '#ff4444';
+                    el.style.animation = 'timerFlash 0.5s infinite';
+                }
+                if(challengeTimeLeft <= 0) {
+                    clearInterval(challengeTimer);
+                    const fb = document.getElementById('challenge-feedback');
+                    fb.innerHTML = '<span style="color:#ff4444">TIME EXPIRED.</span> The answer was <span style="color:var(--green)">C) 130</span>. x=100→60→120→130.';
+                    const btns = document.getElementById('challenge-options').children;
+                    btns[2].classList.add('correct');
+                    for(let b of btns) b.disabled = true;
+                    setTimeout(goToLevel5, 3000);
+                }
+            }, 1000);
+        }
+
+  const challengeWrongReasons = {
+    'A': "That's after the first update only. Keep going: 60×2=120, 120+10=130.",
+    'B': "Check your multiplication. 60×2=120, not 100. Then add 10.",
+    'D': "Recheck step 1: 100-40=60, not 30. Then 60×2=120, 120+10=130."
+  };
+
+        function checkChallenge(btn, isCorrect, option) {
+            clearInterval(challengeTimer);
+            const fb = document.getElementById('challenge-feedback');
+            const btns = document.getElementById('challenge-options').children;
+
+            if(isCorrect) {
+                btn.classList.add('correct');
+                for(let b of btns) b.disabled = true;
+                const bonus = challengeTimeLeft >= 15 ? '+20 SPEED BONUS' : challengeTimeLeft >= 8 ? '+10 BONUS' : '+5 BONUS';
+                fb.innerHTML = `<span style="color:var(--green)">CHAIN DECODED. ${bonus}. ✓</span>`;
+                
+                const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+                state.levels[4].challengeBonus = bonus;
+                state.levels[4].challengeTime  = challengeTimeLeft;
+                localStorage.setItem('cer_state', JSON.stringify(state));
+                setTimeout(goToLevel5, 2000);
+            } else {
+                btn.classList.add('wrong');
+                fb.innerHTML = `<span style="color:var(--amber)">${challengeWrongReasons[option]}</span>`;
+                setTimeout(() => {
+                    btn.classList.remove('wrong');
+                    btn.disabled = false;
+                    startChallengeTimer();
+                }, 2000);
+            }
+        }
+
+        function goToLevel5() {
+            window.location.href = 'level5.html';
+        }
+
+        // Old finishGame function replaced by showPerformanceScreen
+        function finishGame() {
+            showPerformanceScreen();
+        }
+
+        function showVictory() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const report = document.getElementById('victory-report');
+            document.getElementById('completion-screen').style.display = 'none';
+            document.getElementById('victory-screen').classList.add('active');
+
+            // 1. Identity & Rank
+            const totalWrong = (state.levels?.[1]?.wrongAttempts || 0) + (state.levels?.[2]?.wrongAttempts || 0) + (state.levels?.[3]?.wrongAttempts || 0) + (state.levels?.mini?.mistakes || 0) + (state.levels?.[4]?.wrongAttempts || 0);
+            const rank = totalWrong === 0 ? "GRANDMASTER OF LOGIC" : (totalWrong <= 5 ? "SYSTEM ARCHITECT" : (totalWrong <= 12 ? "FIELD AGENT" : "LOGIC APPRENTICE"));
+            
+            // 2. Time
+            const start = state.levels?.[1]?.completedAt || Date.now();
+            const end   = state.levels?.[4]?.completedAt || Date.now();
+            const dur = end - start;
+            const mins  = Math.floor(dur / 60000);
+            const secs  = Math.floor((dur % 60000) / 1000);
+
+            // 3. Emotional Journey
+            const journeys = [];
+            if(state.levels?.[1]?.wrongAttempts === 0) journeys.push("Started with absolute precision.");
+            if(state.levels?.[3]?.wrongAttempts > 2) journeys.push("Faced a significant desync in Level 3.");
+            if(state.levels?.mini?.mistakes > 2) journeys.push("Struggled but persisted through the Memory Leak.");
+            if(state.levels?.[4]?.signal === 'STRONG') journeys.push("Finished with high-strength signal processing.");
+            if(journeys.length === 0) journeys.push("Maintained steady progress through all sectors.");
+
+            report.innerHTML = `
+                <div class="report-section">
+                    <div class="report-title">OPERATIVE_IDENTITY</div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                        <div>
+                            <div style="font-size:2.5rem; color:var(--green); text-shadow:var(--glow-green);">${getName()}</div>
+                            <div style="color:var(--blue); letter-spacing:3px;">${rank}</div>
+                        </div>
+                        <div style="border:1px solid var(--green); padding:5px 10px; color:var(--green); font-size:0.7rem;">BADGE: BREACH_CERTIFIED</div>
+                    </div>
+                </div>
+
+                <div class="report-section">
+                    <div class="report-title">MISSION_OVERVIEW</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+                        <div style="background:rgba(0,212,255,0.05); padding:1rem;">
+                            <div style="font-size:0.7rem; color:rgba(255,255,255,0.4);">TOTAL BREACH TIME</div>
+                            <div style="font-size:1.5rem; color:var(--green);">${mins}m ${secs}s</div>
+                        </div>
+                        <div style="background:rgba(0,212,255,0.05); padding:1rem;">
+                            <div style="font-size:0.7rem; color:rgba(255,255,255,0.4);">TOTAL RETRIES</div>
+                            <div style="font-size:1.5rem; color:var(--red);">${totalWrong}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-section">
+                    <div class="report-title">CONCEPT_SIGNAL_MASTERY</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div><div style="font-size:0.6rem; margin-bottom:4px;">L1: PATTERNS</div> ${getSignalHTML(state.levels?.[1]?.signal || 'WEAK')}</div>
+                        <div><div style="font-size:0.6rem; margin-bottom:4px;">L2: COMMANDS</div> ${getSignalHTML(state.levels?.[2]?.signal || 'WEAK')}</div>
+                        <div><div style="font-size:0.6rem; margin-bottom:4px;">L3: STORAGE</div> ${getSignalHTML(state.levels?.[3]?.signal || 'WEAK')}</div>
+                        <div><div style="font-size:0.6rem; margin-bottom:4px;">L4: UPDATES</div> ${getSignalHTML(state.levels?.[4]?.signal || 'WEAK')}</div>
+                    </div>
+                </div>
+
+                <div class="report-section">
+                    <div class="report-title">CONFIDENCE_CALIBRATION</div>
+                    <div style="font-size:0.9rem; line-height:1.6;">
+                        Your average confidence was <span style="color:var(--amber)">${calculateAvgConfidence(state)} / 3</span>.<br>
+                        Accuracy Correlation: <span style="color:var(--green)">${calculateCorrelation(state, totalWrong)}</span>
+                    </div>
+                </div>
+
+                <div class="report-section">
+                    <div class="report-title">EMOTIONAL_JOURNEY</div>
+                    <ul style="color:rgba(255,255,255,0.7); font-size:0.85rem; padding-left:1.2rem;">
+                        ${journeys.map(j => `<li>${j}</li>`).join('')}
+                    </ul>
+                </div>
+
+                <div class="report-section" style="border:none;">
+                    <div class="report-title">THE_OPERATIVE_BADGE</div>
+                    <div style="color:var(--blue); font-style:italic;">"The system yields. You are verified."</div>
+                </div>
+            `;
+        }
+
+        function calculateAvgConfidence(state) {
+            let total = 0, count = 0;
+            [1,2,3,4].forEach(l => {
+                if(state.levels?.[l]?.confidenceRating) {
+                    total += state.levels[l].confidenceRating;
+                    count++;
+                }
+            });
+            return count > 0 ? (total/count).toFixed(1) : "N/A";
+        }
+
+        function calculateCorrelation(state, totalWrong) {
+            if(totalWrong === 0) return "PERFECT ALIGNMENT";
+            const avgConf = parseFloat(calculateAvgConfidence(state));
+            if(avgConf >= 2.5 && totalWrong > 5) return "OVERCONFIDENT";
+            if(avgConf <= 1.5 && totalWrong < 3) return "UNDERESTIMATED";
+            return "STABLE";
+        }
+
+        function updatePoints() {
+            document.getElementById('points-display').textContent = points;
+        }
+
+
+        // ═══ CONFIDENCE RESPONSE: SHOW ═══
+        async function showConfidenceResponse(val) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const name = state.playerName || 'OPERATIVE';
+
+            const l1Wrong = state.levels?.[1]?.wrongAttempts || 0;
+            const l2Wrong = state.levels?.[2]?.wrongAttempts || 0;
+            const l3Wrong = state.levels?.[3]?.wrongAttempts || 0;
+            const lMiniWrong = state.levels?.mini?.mistakes || 0;
+            const totalWrong = l1Wrong + l2Wrong + l3Wrong + lMiniWrong;
+
+            document.getElementById('confidence-response').classList.add('active');
+
+            const msgEl = document.getElementById('cr-message');
+            const hintEl = document.getElementById('cr-hint-box');
+            const statEl = document.getElementById('cr-stat');
+            const btn = document.getElementById('cr-btn');
+            const label = document.getElementById('cr-label');
+
+            const cfg = getResponseConfig(val, name, totalWrong);
+
+            label.style.color = cfg.color;
+            label.textContent = cfg.label;
+
+            msgEl.style.color = cfg.color;
+            await typewriterCR(msgEl, cfg.message, 20);
+
+            if (val === 1) {
+                hintEl.style.display = 'block';
+                hintEl.innerHTML = getLevelHint();
+
+                if (totalWrong > 0) {
+                    statEl.style.display = 'block';
+                    statEl.textContent = `SYSTEM LOG: ${totalWrong} mistake${totalWrong !== 1 ? 's' : ''} recorded across previous levels.`;
+                }
+            }
+
+            if (cfg.autoDelay) {
+                setTimeout(proceedToGame, cfg.autoDelay);
+            } else {
+                btn.style.display = 'block';
+                btn.textContent = cfg.btnText;
+                btn.style.borderColor = cfg.color;
+                btn.style.color = cfg.color;
+                btn.onmouseover = () => {
+                    btn.style.background = cfg.color;
+                    btn.style.color = 'var(--bg-color, #02020a)';
+                };
+                btn.onmouseout = () => {
+                    btn.style.background = 'transparent';
+                    btn.style.color = cfg.color;
+                };
+                btn.onclick = proceedToGame;
+            }
+        }
+
+        // ═══ CONFIDENCE RESPONSE: CONFIG ═══
+        function getResponseConfig(val, name, totalWrong) {
+            if (val === 1) {
+                let msg;
+                if (totalWrong === 0) {
+                    msg = `Flawless record, ${name}.\nBut Level 4 is the final breach.\nUpdating variables is the peak of this sector.\n\nThe system has prepared a reminder.`;
+                } else if (totalWrong <= 4) {
+                    msg = `You have made ${totalWrong} mistake${totalWrong !== 1 ? 's' : ''} so far, ${name}.\nSelf-updating variables can be confusing.\n\nRead the reminder below.`;
+                } else {
+                    msg = `The journey has been heavy, ${name}.\nLevel 4 requires absolute focus.\n\nRead carefully before entering.`;
+                }
+                return {
+                    label: 'UNCERTAINTY_DETECTED //',
+                    message: msg,
+                    color: '#ffcc44',
+                    btnText: "I'M READY. TAKE ME IN ▶",
+                    autoDelay: 0
+                };
+            } else if (val === 2) {
+                const msgs = [
+                    `Partial confidence, ${name}.\nHonesty is a requirement for this level.\n\nYou have the pieces. Use them.`,
+                    `Almost ready.\nThat is a good state, ${name}.\nThe final breach is close.\n\nProceed.`,
+                    `${name}. The system sees your hesitation.\nBut it also sees your progress.\n\nFinish this.`
+                ];
+                return {
+                    label: 'PARTIAL_CONFIDENCE //',
+                    message: msgs[Math.floor(Math.random() * msgs.length)],
+                    color: 'var(--blue)',
+                    btnText: "LET'S FINISH THIS ▶",
+                    autoDelay: 0
+                };
+            } else {
+                const msgs = [
+                    `Absolute confidence, ${name}.\nNo hesitation detected.\n\nFinal breach initiates in 2 seconds...`,
+                    `Strong signal, ${name}.\nMastery confirmed.\n\nEntering sector...`,
+                    `${name}. Ready.\nThe system yields to your certainty.\n\nInitiating...`
+                ];
+                return {
+                    label: 'CONFIDENCE_CONFIRMED //',
+                    message: msgs[Math.floor(Math.random() * msgs.length)],
+                    color: 'var(--green)',
+                    btnText: '',
+                    autoDelay: 2000
+                };
+            }
+        }
+
+        // ═══ CONFIDENCE RESPONSE: HINT ═══
+        function getLevelHint() {
+            return `
+                <div style="color:var(--green); font-size:0.75rem; letter-spacing:0.15em; margin-bottom:0.6rem;">CONCEPT REMINDER</div>
+                Updating means replacing the old value.<br>
+                <code style="color:var(--green)">x = x + 1</code> is not math.<br>
+                It is a command: "New x = Old x plus 1".<br><br>
+                Always find the current value before calculating the new one.<br><br>
+                <span style="opacity:0.55">The variable evolves line by line.</span>
+            `;
+        }
+
+        // ═══ CONFIDENCE RESPONSE: TYPEWRITER ═══
+        function typewriterCR(el, text, speed) {
+            return new Promise(resolve => {
+                el.innerHTML = '';
+                let i = 0;
+                const interval = setInterval(() => {
+                    const slice = text.slice(0, i);
+                    el.innerHTML = slice.replace(/\n/g, '<br>');
+                    i++;
+                    if (i > text.length) {
+                        clearInterval(interval);
+                        el.innerHTML = text.replace(/\n/g, '<br>');
+                        resolve();
+                    }
+                }, speed || 35);
+            });
+        }
+
+        // ═══ CONFIDENCE RESPONSE: PROCEED ═══
+        function proceedToGame() {
+            document.getElementById('confidence-response').classList.remove('active');
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const conf = state.levels?.[4]?.confidenceRating;
+            if (conf === 1) applySupportiveMode();
+            applyDifficulty();
+            document.getElementById('game-screen').style.display = 'flex';
+            setupPuzzleBackground();
+            startLevel();
+        }
+
+        // ═══ CONFIDENCE RESPONSE: SUPPORT MODE ═══
+        function applySupportiveMode() {
+            const strip = document.createElement('div');
+            strip.id = 'support-strip';
+            strip.style.cssText = `
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                z-index: 800;
+                background: rgba(2,2,10,0.95);
+                border-top: 1px solid rgba(255,204,68,0.2);
+                color: rgba(255,204,68,0.6);
+                font-family: var(--font-main);
+                font-size: 0.62rem;
+                letter-spacing: 0.14em;
+                padding: 6px 1.5rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            `;
+            strip.innerHTML = `
+                <span>${getSupportStripText()}</span>
+                <span onclick="document.getElementById('support-strip').style.display='none'" style="cursor:pointer; opacity:0.4; font-size:0.7rem;">✕ DISMISS</span>
+            `;
+            document.body.appendChild(strip);
+
+            if (typeof timerInterval !== 'undefined') {
+                clearInterval(timerInterval);
+            }
+            const timerEl = document.getElementById('timer');
+            if (timerEl) timerEl.style.display = 'none';
+
+            window._supportMode = true;
+        }
+
+        function getSupportStripText() {
+            return 'SUPPORT: x = x + 5 means "New x = Old x + 5". Step by step.';
+        }
+    </script>
+</body>
+</html>

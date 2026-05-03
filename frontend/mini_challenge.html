@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Escape Room - Mini Challenge: The Memory Leak</title>
+    <style>
+        :root {
+            --bg-color: #02020a;
+            --green: #00ff88;
+            --blue: #00d4ff;
+            --blue-glass: rgba(0, 212, 255, 0.1);
+            --blue-border: rgba(0, 212, 255, 0.3);
+            --font-main: 'Fira Code', 'Courier New', monospace;
+            --glow-green: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-blue: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: var(--font-main);
+            overflow: hidden;
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        .recall-input {
+            background: transparent; border: 1px solid #ffaa00;
+            color: #ffaa00; font-family: var(--font-main);
+            font-size: 1.2rem; padding: 0.5rem; width: 150px;
+            text-align: center; outline: none; margin-top: 1rem;
+        }
+        .signal-bar { display: flex; gap: 4px; margin-top: 10px; justify-content: center; }
+        .sig-block { width: 15px; height: 22px; border: 1px solid rgba(255,170,0,0.2); }
+        .sig-block.active.amber { background: #ffaa00; box-shadow: 0 0 10px #ffaa00; }
+        .sig-block.active.red   { background: #ff4444; box-shadow: 0 0 10px #ff4444; }
+        
+        .timer-display { position: absolute; top: 10px; right: 20px; font-family: monospace; font-size: 1.1rem; color: #ff4444; letter-spacing: 1px; z-index: 10; display: none; }
+        .timer-display.visible { display: block; }
+
+        .screen { display: none; position: fixed; inset: 0; background: var(--bg-color); z-index: 500; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; text-align: center; }
+        .screen.active { display: flex; }
+        .hl { color: var(--green); text-shadow: var(--glow-green); }
+        .amb { color: #ffaa00; text-shadow: 0 0 10px rgba(255,170,0,0.3); }
+        .cod { font-family: monospace; background: rgba(255,170,0,0.1); padding: 2px 6px; }
+
+        /* --- BACKGROUND --- */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            background-color: var(--blue);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: float linear infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(110vh);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translateY(-10vh);
+                opacity: 0;
+            }
+        }
+
+        /* --- UI --- */
+        #game-screen {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            padding: 2rem;
+            z-index: 10;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--blue-border);
+            padding-bottom: 1rem;
+        }
+
+        .level-tag {
+            color: #ffaa00;
+            font-size: 1.2rem;
+            text-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
+        }
+
+        .panels-container {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 1.5rem;
+            flex-grow: 1;
+        }
+
+        .panel {
+            background: var(--blue-glass);
+            border: 1px solid var(--blue-border);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border-radius: 4px;
+        }
+
+        .amber-flicker {
+            animation: flicker-amber 0.5s infinite;
+        }
+
+        @keyframes flicker-amber {
+            0% {
+                border-color: var(--blue-border);
+            }
+
+            50% {
+                border-color: #ffaa00;
+                box-shadow: 0 0 15px rgba(255, 170, 0, 0.4);
+            }
+
+            100% {
+                border-color: var(--blue-border);
+            }
+        }
+
+        .panel-header {
+            background: var(--blue-border);
+            padding: 8px 15px;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* REORDER LIST */
+        .reorder-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+
+        .reorder-item {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--blue-border);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--blue);
+            font-family: var(--font-main);
+            font-size: 0.9rem;
+            border-radius: 4px;
+            transition: 0.3s;
+        }
+
+        .reorder-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .move-btn {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid var(--blue-border);
+            color: var(--blue);
+            width: 24px;
+            height: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .move-btn:hover {
+            background: var(--blue);
+            color: var(--bg-color);
+        }
+
+        /* VISUAL PANEL */
+        .visual-stage {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            position: relative;
+        }
+
+        .variable-box {
+            width: 150px;
+            height: 150px;
+            border: 4px solid var(--blue);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            color: var(--green);
+            transition: all 0.5s;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .variable-box::before {
+            content: 'user_name';
+            position: absolute;
+            top: -30px;
+            left: 0;
+            font-size: 1rem;
+            color: var(--blue);
+            text-transform: uppercase;
+        }
+
+        .variable-box.glow {
+            box-shadow: var(--glow-green);
+            border-color: var(--green);
+        }
+
+        /* FLOW PANEL */
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .flow-node {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid var(--blue-border);
+            border-radius: 8px;
+            padding: 0.8rem 1.5rem;
+            color: var(--blue);
+            font-size: 0.85rem;
+            text-align: center;
+            opacity: 0.5;
+            transition: 0.3s;
+            min-width: 180px;
+        }
+
+        .flow-node.active {
+            opacity: 1;
+            border-color: var(--green);
+            color: var(--green);
+            background: rgba(0, 255, 136, 0.1);
+            box-shadow: var(--glow-green);
+        }
+
+        /* MODAL */
+        #modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 10, 0.95);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: var(--bg-color);
+            border: 2px solid #ffaa00;
+            padding: 2.5rem;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255, 170, 0, 0.2);
+        }
+
+        .option-btn {
+            background: transparent;
+            border: 1px solid var(--blue-border);
+            color: #fff;
+            padding: 1rem 2rem;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: var(--font-main);
+            margin-top: 2rem;
+        }
+
+        .option-btn:hover {
+            border-color: var(--blue);
+            background: var(--blue-glass);
+        }
+
+        .ctrl-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            padding: 0.8rem 1.5rem;
+            cursor: pointer;
+            font-family: var(--font-main);
+            transition: 0.3s;
+        }
+
+        .ctrl-btn:hover {
+            background: var(--green);
+            color: var(--bg-color);
+            box-shadow: var(--glow-green);
+        }
+    </style>
+</head>
+
+<body>
+  <div id="progress-bar" style="
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 9999;
+    display: flex; justify-content: center;
+    align-items: center; gap: 0.6rem;
+    padding: 0.4rem 1rem;
+    background: rgba(2,2,10,0.95);
+    border-bottom: 1px solid rgba(0,255,136,0.1);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.15em;
+  ">
+    <span id="pb1">LVL 1</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb2">LVL 2</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb3">LVL 3</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pbm">MINI <small onclick="replayMExplain()" style="cursor:help; opacity:0.5">[?]</small></span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb4">LVL 4</span>
+  </div>
+
+  <button id="skip-intro-btn" onclick="skipIntro()" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: transparent;
+    border: 1px solid rgba(255,170,0,0.3);
+    color: rgba(255,170,0,0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    padding: 6px 14px;
+    cursor: pointer;
+    z-index: 999;
+    display: none;
+  ">SKIP ▶▶</button>
+    <div class="scanlines"></div>
+    <div id="particles-container"></div>
+
+    <!-- ═══ IMPROVEMENT 1: INTRO SCREEN ═══ -->
+    <div id="intro-screen" class="screen">
+        <div class="panel amber-flicker" style="max-width:600px; width:90%;">
+            <div class="panel-header">ANOMALY_REPORT</div>
+            <div class="panel-content">
+                <div id="intro-narrative" style="font-size:1.2rem; line-height:1.8; margin-bottom:2rem;"></div>
+                <button id="intro-btn" class="ctrl-btn" style="display:none;" onclick="showWorkedExample()">[ ANALYZE ▶ ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ -->
+    <div id="worked-example-screen" class="screen">
+        <div class="panel amber-flicker" style="max-width:600px; width:90%;">
+            <div class="panel-header">SIMULATION_LOG</div>
+            <div class="panel-content">
+                <div id="example-area" style="text-align: left; font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;"></div>
+                <button id="example-btn" class="ctrl-btn" style="display:none;" onclick="showConfidence()">[ I UNDERSTAND ▶ ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 5: CONFIDENCE ═══ -->
+    <div id="confidence-screen" class="screen">
+        <div class="panel amber-flicker" style="max-width:500px; width:90%;">
+            <div class="panel-header">STRESS_TEST</div>
+            <div class="panel-content">
+                <div style="color: #ffaa00; margin-bottom: 2rem;">"System instability rising..."<br>How confident are you feeling?</div>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <button class="ctrl-btn" onclick="saveConfidence(1)">1 — Not Sure</button>
+                    <button class="ctrl-btn" onclick="saveConfidence(2)">2 — Somewhat</button>
+                    <button class="ctrl-btn" onclick="saveConfidence(3)">3 — Ready</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-screen">
+        <div class="header">
+            <div class="level-tag">MINI_CHALLENGE // THE_MEMORY_LEAK</div>
+            <div class="logic-points">SYSTEM_STATUS: <span id="status-display"
+                    style="color: #ffaa00;">DESYNC_DETECTED</span></div>
+        </div>
+
+        <div class="panels-container">
+            <div class="panel amber-flicker" id="code-panel">
+                <div class="panel-header">REORDER_LOGIC</div>
+                <div class="panel-content">
+                    <div id="timer" class="timer-display">TIME: 1:00</div>
+                    <div style="color: #ffaa00; font-size: 0.8rem; margin-bottom: 10px;">// REORDER_LOGIC_BLOCKS</div>
+                    <div class="reorder-list" id="reorder-list"></div>
+                    <button class="ctrl-btn" style="width: 100%; margin-top: 20px;"
+                        onclick="checkChallenge()">CHECK_SEQUENCE</button>
+                </div>
+            </div>
+
+            <div class="panel amber-flicker" id="visual-panel">
+                <div class="panel-header">VISUAL_STAGE</div>
+                <div class="panel-content">
+                    <div class="visual-stage">
+                        <div class="variable-box" id="var-box"></div>
+                    </div>
+                    <div id="execution-narrative"
+                        style="color: #ff4444; margin-top: 1rem; font-style: italic; text-align: center; min-height: 3rem;">
+                        SYSTEM ERROR: Variable 'user_name' referenced before assignment.
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel amber-flicker" id="flow-panel">
+                <div class="panel-header">LOGIC_FLOW</div>
+                <div class="panel-content">
+                    <div class="flow-diagram" id="flow-diagram">
+                        <div class="flow-node active" style="border-color:#ffaa00; color:#ffaa00;">MEMORY_LEAK_DETECTED
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay">
+        <div class="modal-box" id="modal-box">
+            <h2 id="modal-title" style="color: #ffaa00;">SYSTEM_DESYNC</h2>
+            <p id="modal-desc" style="margin-top: 1.5rem; line-height: 1.6;">
+                Wait... the escape door is locked tight.<br>The system is trying to use data it hasn't remembered
+                yet.<br><br>
+                We have a Memory Leak. You need to reorder the logic so the system 'stores' the key before it tries to
+                'turn' it.
+            </p>
+            <div id="modal-options">
+                <button class="option-btn" onclick="closeModal()">INITIALIZE REPAIR ▶</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ═══ IMPROVEMENT 2: EMOTIONAL MEMORY ═══ */
+        function getEmotionalMemory() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const l3 = state.levels?.[3] || {};
+            const wrong = l3.wrongAttempts || 0;
+            const name = state.playerName || "OPERATIVE";
+            if (wrong === 0) return [`The system tried to throw you, ${name}.`, "You didn't flinch."];
+            return [`Variable storage is tricky, isn't it?`, "The Desync was inevitable."];
+        }
+
+        function getName() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            return state.playerName || "OPERATIVE";
+        }
+
+        /* ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ */
+        async function showIntro() {
+            document.getElementById('intro-screen').classList.add('active');
+            const target = document.getElementById('intro-narrative');
+            const mem = getEmotionalMemory();
+            const lines = [
+                ...mem.map(t => ({ text: t, cls: 'amb' })),
+                { text: "A desync has occurred.", cls: '' },
+                { text: "The system is processing logic out of order.", cls: '' }
+            ];
+            for(let line of lines) {
+                const div = document.createElement('div');
+                div.className = line.cls;
+                target.appendChild(div);
+                await typeText(div, line.text.replace('{name}', getName()));
+                await new Promise(r => setTimeout(r, 200));
+            }
+            document.getElementById('intro-btn').style.display = 'block';
+            document.getElementById('skip-intro-btn').style.display = 'block';
+        }
+
+        async function showWorkedExample() {
+            document.getElementById('intro-screen').classList.remove('active');
+            document.getElementById('worked-example-screen').classList.add('active');
+            const area = document.getElementById('example-area');
+            const lines = [
+                { text: "// Order matters.", cls: 'amb' },
+                { text: "1. key = \"ABC\"", cls: 'cod hl' },
+                { text: "2. print(key)", cls: 'cod hl' },
+                { text: "// If we try to print before storing...", cls: 'amb', pause: 300 },
+                { text: "ERROR: 'key' is not defined.", cls: 'red', pause: 400 },
+                { text: "You must fix the desync.", cls: 'amb' }
+            ];
+            for(let line of lines) {
+                const div = document.createElement('div');
+                div.className = line.cls;
+                area.appendChild(div);
+                await typeText(div, line.text);
+                await new Promise(r => setTimeout(r, line.pause || 150));
+            }
+            document.getElementById('example-btn').style.display = 'block';
+        }
+
+        function typeText(el, text) {
+            return new Promise(resolve => {
+                let i = 0;
+                const inv = setInterval(() => {
+                    el.textContent = text.slice(0, i); i++;
+                    if(i > text.length) { clearInterval(inv); resolve(); }
+                }, 12);
+                const skipHandler = () => {
+                    clearInterval(inv);
+                    el.textContent = text;
+                    document.body.removeEventListener('click', skipHandler);
+                    document.body.removeEventListener('touchstart', skipHandler);
+                    resolve();
+                };
+                document.body.addEventListener('click', skipHandler);
+                document.body.addEventListener('touchstart', skipHandler);
+            });
+        }
+
+        /* ═══ IMPROVEMENT 5: CONFIDENCE ═══ */
+        function showConfidence() {
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('confidence-screen').classList.add('active');
+        }
+        function saveConfidence(val) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            if(!state.levels) state.levels = {};
+            if(!state.levels.mini) state.levels.mini = {};
+            state.levels.mini.confidenceRating = val;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+            
+            document.getElementById('confidence-screen').classList.remove('active');
+            applyDifficulty();
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        function showRecall() {
+            const overlay = document.getElementById('modal-overlay');
+            overlay.style.display = 'flex';
+            const box = document.getElementById('modal-box');
+            box.innerHTML = `
+                <h2 style="color:#ffaa00">RECALL_PROTOCOL</h2>
+                <p style="margin-top:1rem">Lock it in. Which variable name was causing the error?</p>
+                <div style="margin:2rem 0">
+                    <input type="text" id="recall-input" class="recall-input">
+                </div>
+                <button class="ctrl-btn" onclick="confirmRecall()">CONFIRM ▶</button>
+            `;
+            document.getElementById('recall-input').focus();
+        }
+
+        function confirmRecall() {
+            const val = document.getElementById('recall-input').value.trim().toLowerCase();
+            const isCorrect = (val === "user_name");
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            state.levels.mini.typedRecall = isCorrect;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+
+            if(!isCorrect) {
+                const msg = document.createElement('p');
+                msg.style.color = '#ffaa00'; msg.style.marginTop = '1rem';
+                msg.textContent = "The system noticed the hesitation. Moving forward anyway.";
+                document.getElementById('recall-input').parentElement.appendChild(msg);
+                setTimeout(showComplete, 1500);
+            } else {
+                showComplete();
+            }
+        }
+
+        function saveSignal(time) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const wrongCount = state.levels?.mini?.wrongAttempts || 0;
+            let signal;
+            if (wrongCount === 0 && time < 15000) signal = 'STRONG';
+            else if (wrongCount === 0) signal = 'GOOD';
+            else if (wrongCount <= 2) signal = 'MODERATE';
+            else signal = 'WEAK';
+            
+            state.levels.mini.signal = signal;
+            state.levels.mini.responseTime = time;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+        }
+
+        function getSignalHTML(signal) {
+            const map = { 'STRONG': 5, 'GOOD': 4, 'MODERATE': 3, 'WEAK': 2 };
+            const count = map[signal] || 0;
+            const color = count >= 4 ? 'amber' : 'red';
+            let html = `<div class="signal-bar">`;
+            for(let i=1; i<=5; i++) {
+                html += `<div class="sig-block ${i<=count ? 'active ' + color : ''}"></div>`;
+            }
+            html += ` <span style="margin-left:8px; font-size:0.7rem; color:${color === 'amber' ? '#ffaa00' : '#ff4444'}">${signal}</span></div>`;
+            return html;
+        }
+
+        /* ═══ IMPROVEMENT 7: ADAPTIVE DIFFICULTY ═══ */
+        let timerInterval;
+        function applyDifficulty() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const diff = state.difficulty || 'normal';
+            if (diff === 'easy') {
+                document.getElementById('execution-narrative').innerHTML += `<br><span style="color:#ffaa00; opacity:0.6; font-size:0.8rem;">HINT: Variables must be assigned before they are printed.</span>`;
+            } else if (diff === 'hard') {
+                startTimer(60);
+            }
+        }
+
+        function startTimer(seconds) {
+            const el = document.getElementById('timer');
+            el.classList.add('visible');
+            let left = seconds;
+            timerInterval = setInterval(() => {
+                left--;
+                const m = Math.floor(left/60);
+                const s = left%60;
+                el.textContent = `TIME: ${m}:${s < 10 ? '0' + s : s}`;
+                if(left <= 10) el.style.color = '#ff4444';
+                if(left <= 0) {
+                    clearInterval(timerInterval);
+                    alert("TIME EXPIRED. Desync reached critical levels.");
+                    location.reload();
+                }
+            }, 1000);
+        }
+
+        /* ═══ IMPROVEMENT 8: REPLAY ═══ */
+        function replayMExplain() { window.location.reload(); }
+
+        /* ═══ IMPROVEMENT 9: GHOST STATS ═══ */
+        function showGhostStats(correct) {
+            const seed = (1337 + 42); // Mini
+            const pct  = 45 + (seed % 38);
+            const avg  = 1 + (seed % 3);
+            const fb = document.getElementById('execution-narrative');
+            const stats = document.createElement('div');
+            stats.style.cssText = 'color: rgba(255,170,0,0.3); font-size: 0.68rem; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.9s;';
+            stats.textContent = correct 
+                ? `${pct}% of operatives solved this first try.` 
+                : `You're not alone — ${100-pct}% also struggled here. Average attempts: ${avg}`;
+            fb.appendChild(stats);
+            setTimeout(() => stats.style.opacity = '1', 900);
+        }
+
+        const blocks = [
+            { id: 'p1', text: 'print("Identity: " + user_name)' },
+            { id: 'p2', text: 'print("System Booting...")' },
+            { id: 'a1', text: 'user_name = "Agent_707"' },
+            { id: 'p3', text: 'print("Accessing Database...")' }
+        ];
+
+        const correctOrder = ['p2', 'p3', 'a1', 'p1'];
+        let currentOrder = [...blocks].sort(() => Math.random() - 0.5);
+        let mistakes = 0;
+        let puzzleStartTime;
+
+        // ═══ FIX M-1: DOMContentLoaded ═══
+        document.addEventListener('DOMContentLoaded', () => {
+            // ═══ FIX M-2: cssText WIPES PROGRESS BAR ═══
+            document.getElementById('pbm').style.color = '#ffaa00';
+            document.getElementById('pbm').style.textShadow = '0 0 8px #ffaa00';
+
+            (function markCompleted() {
+              const state = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+              );
+              const map = {
+                pb1: state.levels?.[1]?.completed,
+                pb2: state.levels?.[2]?.completed,
+                pb3: state.levels?.[3]?.completed,
+                pbm: state.levels?.mini?.completed,
+                pb4: state.levels?.[4]?.completed
+              };
+              Object.entries(map).forEach(([id, done]) => {
+                if (done) {
+                  const el = document.getElementById(id);
+                  if (el) el.textContent = el.textContent + ' ✓';
+                }
+              });
+            })();
+
+            // Lazy particles
+            document.addEventListener('click', lazyParticles, { once: true });
+            setTimeout(lazyParticles, 3000);
+
+            renderList();
+            showIntro();
+        });
+
+        let particlesCreated = false;
+        function lazyParticles() {
+            if (!particlesCreated) {
+                createParticles();
+                particlesCreated = true;
+            }
+        }
+
+        function skipIntro() {
+            document.getElementById('intro-screen').classList.remove('active');
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('skip-intro-btn').style.display = 'none';
+            lazyParticles();
+            saveConfidence(3);
+        }
+
+        function createParticles() {
+            const container = document.getElementById('particles-container');
+            for (let i = 0; i < 20; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = Math.random() * 3 + 2;
+                p.style.width = `${size}px`; p.style.height = `${size}px`;
+                p.style.left = `${Math.random() * 100}vw`;
+                p.style.animationDuration = `${Math.random() * 10 + 10}s`;
+                container.appendChild(p);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+            puzzleStartTime = Date.now();
+        }
+
+        function renderList() {
+            const list = document.getElementById('reorder-list');
+            list.innerHTML = '';
+            currentOrder.forEach((block, idx) => {
+                const item = document.createElement('div');
+                item.className = 'reorder-item';
+                item.innerHTML = `
+                    <span>${block.text}</span>
+                    <div class="reorder-controls">
+                        <button class="move-btn" onclick="moveBlock(${idx}, -1)">↑</button>
+                        <button class="move-btn" onclick="moveBlock(${idx}, 1)">↓</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function moveBlock(idx, dir) {
+            const newIdx = idx + dir;
+            if (newIdx < 0 || newIdx >= currentOrder.length) return;
+            const temp = currentOrder[idx];
+            currentOrder[idx] = currentOrder[newIdx];
+            currentOrder[newIdx] = temp;
+            renderList();
+        }
+
+        function checkChallenge() {
+            const isCorrect = currentOrder.every((b, idx) => b.id === correctOrder[idx]);
+            const narr = document.getElementById('execution-narrative');
+            const flow = document.getElementById('flow-diagram');
+
+            if (isCorrect) {
+                if(timerInterval) clearInterval(timerInterval);
+                saveSignal(Date.now() - puzzleStartTime);
+                showGhostStats(true);
+                narr.innerHTML = "SYSTEM REPAIR SUCCESSFUL. Variable flow restored.";
+                narr.style.color = "var(--green)";
+                document.getElementById('status-display').textContent = "FIXED";
+                document.getElementById('status-display').style.color = "var(--green)";
+                document.getElementById('var-box').textContent = "707";
+                document.getElementById('var-box').classList.add('glow');
+
+                flow.innerHTML = '';
+                currentOrder.forEach((b, idx) => {
+                    flow.innerHTML += `<div class="flow-node active">${b.text}</div>`;
+                    if (idx < 3) flow.innerHTML += '<div style="color:var(--green); margin: 5px;">↓</div>';
+                });
+
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('amber-flicker'));
+
+                setTimeout(showRecall, 1500);
+            } else {
+                showGhostStats(false);
+                mistakes++;
+                if (mistakes >= 5) showIntervention();
+                else if (mistakes >= 3) narr.innerHTML = "AI MENTOR: Look at the Flow Diagram. Data must be defined (stored) before it can be displayed.";
+                else narr.innerHTML = "AI MENTOR: The computer is literal. It tried to find user_name on line 1, but you didn't create the 'vessel' until line 3!";
+
+                const list = document.getElementById('reorder-list');
+                list.style.animation = 'shake 0.3s';
+                setTimeout(() => list.style.animation = '', 300);
+            }
+        }
+
+        function showIntervention() {
+            const overlay = document.getElementById('modal-overlay');
+            const title = document.getElementById('modal-title');
+            const desc = document.getElementById('modal-desc');
+            const options = document.getElementById('modal-options');
+
+            title.textContent = "FRIENDLY_INTERVENTION";
+            title.style.color = "var(--blue)";
+            desc.innerHTML = "Take a breath! You're doing great. 🌟<br><br>Think of a Variable like a physical box. You can't take a toy out of a box (print) until you first put the toy inside (assignment).<br><br>Try this: Put the line <b>user_name = \"Agent_707\"</b> before you try to print it. The system reads top-to-bottom!";
+            options.innerHTML = '<button class="option-btn" onclick="closeModal()">I\'VE GOT THIS ▶</button>';
+            overlay.style.display = 'flex';
+        }
+
+        function showComplete() {
+            const overlay = document.getElementById('modal-overlay');
+            const box = document.getElementById('modal-box');
+            
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const signal = state.levels?.mini?.signal || 'WEAK';
+            const sigHTML = `<div style="font-size:0.7rem; color:#ffaa00; opacity:0.6; margin-bottom:10px;">CONCEPT SIGNAL:</div>` + getSignalHTML(signal);
+
+            box.innerHTML = `
+                ${sigHTML}
+                <h2 style="color:var(--green); margin-top:2rem">MINI-CHALLENGE COMPLETE</h2>
+                <p style="margin-top:1.5rem; line-height:1.6">
+                    LOGIC_STREAK: +15 XP<br><br>
+                    AI Mentor: "You've mastered how to store a static name. But what if the data changes? In Level 4, we'll learn how variables can 'evolve'—just like your escape timer!"
+                </p>
+                <div style="margin-top:2rem">
+                    <button class="ctrl-btn" onclick="completeMiniAndContinue()">PROCEED TO LEVEL 4 ▶</button>
+                    <!-- ═══ FIX M-3: RETURN TO HUB ═══ -->
+                    <button onclick="window.location.href='hub.html'"
+                            style="background:transparent; border:none;
+                                 color:rgba(255,170,0,0.3);
+                                 font-family:var(--font-main);
+                                 font-size:0.6rem; cursor:pointer;
+                                 letter-spacing:0.1em; margin-top:0.5rem;
+                                 display:block; width:100%;"
+                            onmouseover="this.style.color='#ffaa00'"
+                            onmouseout="this.style.color='rgba(255,170,0,0.3)'">
+                        ↩ RETURN TO HUB
+                    </button>
+                    <button class="ctrl-btn" onclick="replayMExplain()" style="font-size:0.7rem; opacity:0.5; border:none; margin-top:1rem;">↺ REPLAY</button>
+                </div>
+            `;
+            overlay.style.display = 'flex';
+        }
+
+        function completeMiniAndContinue() {
+            // ═══ FIX M-4: VERIFY STATE SAVING ═══
+            const _s = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+            );
+            if (!_s.levels) _s.levels = {};
+            _s.levels.mini = {
+                ..._s.levels.mini,
+                completed: true,
+                completedAt: Date.now(),
+                mistakes: mistakes
+            };
+            _s.currentLevel = 4;
+            localStorage.setItem('cer_state', JSON.stringify(_s));
+            window.location.href = 'level4.html';
+        }
+    </script>
+    <style>
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px);
+            }
+
+            75% {
+                transform: translateX(10px);
+            }
+        }
+    </style>
+</body>
+
+</html>

@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Escape Room - Level 3: Variables</title>
+    <style>
+        :root {
+            --bg-color: #02020a;
+            --green: #00ff88;
+            --blue: #00d4ff;
+            --blue-glass: rgba(0, 212, 255, 0.1);
+            --blue-border: rgba(0, 212, 255, 0.3);
+            --font-main: 'Fira Code', 'Courier New', monospace;
+            --glow-green: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-blue: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: #fff;
+            font-family: var(--font-main);
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-top: 2rem;
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        .recall-input {
+            background: transparent; border: 1px solid var(--green);
+            color: var(--green); font-family: var(--font-main);
+            font-size: 1.2rem; padding: 0.5rem; width: 100px;
+            text-align: center; outline: none; margin-top: 1rem;
+        }
+        .signal-bar { display: flex; gap: 4px; margin-top: 10px; justify-content: center; }
+        .sig-block { width: 15px; height: 22px; border: 1px solid rgba(0,212,255,0.2); }
+        .sig-block.active.green { background: var(--green); box-shadow: 0 0 10px var(--green); }
+        .sig-block.active.amber { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+        .sig-block.active.red   { background: var(--red); box-shadow: 0 0 10px var(--red); }
+        
+        .timer-display { position: absolute; top: 10px; right: 20px; font-family: monospace; font-size: 1.1rem; color: var(--red); letter-spacing: 1px; z-index: 10; display: none; }
+        .timer-display.visible { display: block; }
+        .timer-display.flash { animation: timerFlash 0.5s infinite; }
+        @keyframes timerFlash { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .screen { display: none; position: fixed; inset: 0; background: var(--bg-color); z-index: 500; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; text-align: center; }
+        .screen.active { display: flex; }
+        .hl { color: var(--green); text-shadow: var(--glow-green); }
+        .amb { color: var(--amber); }
+        .cod { font-family: monospace; background: rgba(0,212,255,0.1); padding: 2px 6px; }
+
+        /* --- BACKGROUND --- */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background-image: linear-gradient(rgba(0, 212, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg) translateY(-50%);
+            animation: grid-move 20s linear infinite;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        @keyframes grid-move {
+            0% {
+                transform: perspective(500px) rotateX(60deg) translateY(-50%);
+            }
+
+            100% {
+                transform: perspective(500px) rotateX(60deg) translateY(0%);
+            }
+        }
+
+        #particles-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            background-color: var(--blue);
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: float linear infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(110vh);
+                opacity: 0;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: translateY(-10vh);
+                opacity: 0;
+            }
+        }
+
+        /* --- UI COMPONENTS --- */
+        #intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(2, 2, 10, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        #completion-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: var(--bg-color);
+            z-index: 200;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .narrative-block {
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .text-line {
+            font-size: 1.4rem;
+            margin-bottom: 0.8rem;
+            color: var(--blue);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.5s ease-out;
+        }
+
+        .text-line.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .continue-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            padding: 0.8rem 2rem;
+            font-family: var(--font-main);
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin-top: 2rem;
+            opacity: 0;
+            transition: 0.3s;
+            box-shadow: var(--glow-green);
+            display: none;
+        }
+
+        .continue-btn.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        .continue-btn:hover {
+            background: var(--green);
+            color: var(--bg-color);
+        }
+
+        /* --- GAME INTERFACE --- */
+        #game-screen {
+            display: none;
+            width: 100%;
+            min-height: 100vh;
+            padding: 2rem;
+            padding-bottom: 4rem;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--blue-border);
+            padding-bottom: 1rem;
+        }
+
+        .level-tag {
+            color: var(--blue);
+            font-size: 1.2rem;
+            text-shadow: var(--glow-blue);
+        }
+
+        .panels-container {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 1.5rem;
+            flex-grow: 1;
+        }
+
+        .panel {
+            background: var(--blue-glass);
+            border: 1px solid var(--blue-border);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border-radius: 4px;
+        }
+
+        .panel-header {
+            background: var(--blue-border);
+            padding: 8px 15px;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+        }
+
+        .panel-content {
+            padding: 1.5rem;
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* CODE PANEL */
+        .code-container {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            color: var(--green);
+        }
+
+        .code-row {
+            padding-left: 10px;
+            border-left: 3px solid transparent;
+            transition: 0.3s;
+        }
+
+        .code-row.active {
+            background: rgba(0, 255, 136, 0.1);
+            border-left-color: var(--green);
+            box-shadow: inset 5px 0 10px rgba(0, 255, 136, 0.1);
+        }
+
+        /* VISUAL PANEL */
+        .visual-stage {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            position: relative;
+        }
+
+        .variable-box {
+            width: 150px;
+            height: 150px;
+            border: 4px solid var(--blue);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            color: var(--green);
+            transition: all 0.5s;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .variable-box::before {
+            content: attr(data-label);
+            position: absolute;
+            top: -30px;
+            left: 0;
+            font-size: 1rem;
+            color: var(--blue);
+            text-transform: uppercase;
+        }
+
+        .variable-box.glow {
+            box-shadow: var(--glow-green);
+            border-color: var(--green);
+        }
+
+        .falling-value {
+            position: absolute;
+            font-size: 3rem;
+            color: var(--green);
+            text-shadow: var(--glow-green);
+            z-index: 5;
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .output-pulse {
+            position: absolute;
+            font-size: 2.5rem;
+            color: var(--green);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @keyframes pulse-out {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(2);
+                opacity: 0;
+            }
+        }
+
+        /* FLOW PANEL */
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .flow-node {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid var(--blue-border);
+            border-radius: 8px;
+            padding: 0.8rem 1.5rem;
+            color: var(--blue);
+            font-size: 0.95rem;
+            text-align: center;
+            opacity: 0.5;
+            transition: 0.3s;
+            position: relative;
+            min-width: 150px;
+        }
+
+        .flow-node.active {
+            opacity: 1;
+            border-color: var(--green);
+            color: var(--green);
+            background: rgba(0, 255, 136, 0.1);
+            box-shadow: var(--glow-green);
+            transform: scale(1.05);
+            z-index: 2;
+        }
+
+        .flow-arrow {
+            color: var(--blue-border);
+            font-size: 1.5rem;
+            margin: 0.3rem 0;
+            transition: 0.3s;
+        }
+
+        .flow-node.active+.flow-arrow {
+            color: var(--green);
+            text-shadow: var(--glow-green);
+        }
+
+        /* OUTPUT PANEL */
+        .output-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-top: 1px solid var(--blue-border);
+            padding: 1rem;
+            margin-top: 1rem;
+            min-height: 100px;
+            font-family: var(--font-main);
+            color: var(--green);
+            width: 100%;
+        }
+
+        .output-header {
+            font-size: 0.8rem;
+            color: var(--blue);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+
+        .output-item {
+            margin: 0.2rem 0;
+            animation: slide-up 0.3s ease-out;
+        }
+
+        @keyframes slide-up {
+            from {
+                transform: translateY(10px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* CONTROLS */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            justify-content: center;
+        }
+
+        .ctrl-btn {
+            background: transparent;
+            border: 1px solid var(--blue);
+            color: var(--blue);
+            padding: 0.8rem 1.5rem;
+            cursor: pointer;
+            font-family: var(--font-main);
+            transition: 0.3s;
+        }
+
+        .ctrl-btn:hover:not(:disabled) {
+            background: var(--blue);
+            color: var(--bg-color);
+            box-shadow: var(--glow-blue);
+        }
+
+        .ctrl-btn.primary {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .ctrl-btn.primary:hover:not(:disabled) {
+            background: var(--green);
+            color: var(--bg-color);
+            box-shadow: var(--glow-green);
+        }
+
+        .ctrl-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* MODAL */
+        #modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 10, 0.9);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: var(--bg-color);
+            border: 2px solid var(--blue);
+            padding: 2.5rem;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: var(--glow-blue);
+        }
+
+        .puzzle-code {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            color: var(--green);
+            text-align: left;
+            border: 1px solid var(--blue-border);
+            border-radius: 6px;
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            line-height: 1.8;
+            box-shadow: inset 0 0 15px rgba(0, 212, 255, 0.05);
+        }
+
+        .puzzle-code-line {
+            padding-left: 10px;
+            border-left: 3px solid transparent;
+            transition: 0.3s;
+        }
+
+        .puzzle-code-line.highlight {
+            background: rgba(0, 255, 136, 0.1);
+            border-left-color: var(--green);
+            box-shadow: inset 5px 0 10px rgba(0, 255, 136, 0.1);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .option-btn {
+            background: transparent;
+            border: 1px solid var(--blue-border);
+            color: #fff;
+            padding: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .option-btn:hover {
+            border-color: var(--blue);
+            background: var(--blue-glass);
+        }
+
+        .option-btn.correct {
+            border-color: var(--green);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .option-btn.wrong {
+            border-color: #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+        }
+
+        .hint-text {
+            margin-top: 1rem;
+            color: var(--blue);
+            font-style: italic;
+            font-size: 0.9rem;
+            min-height: 1.2rem;
+        }
+
+        /* COMPLETION */
+        .points-box {
+            margin: 2rem 0;
+            padding: 1rem;
+            border: 1px dashed var(--green);
+            display: inline-block;
+        }
+
+        .point-item {
+            color: var(--green);
+            margin: 0.5rem 0;
+            font-size: 1.2rem;
+        }
+
+        /* ═══ RECALL FIX: CSS ANIMATION ═══ */
+        @keyframes recallShake {
+            0%,100% { transform: translateX(0); }
+            20%     { transform: translateX(-8px); }
+            40%     { transform: translateX(8px); }
+            60%     { transform: translateX(-5px); }
+            80%     { transform: translateX(5px); }
+        }
+
+        .recall-shake {
+            animation: recallShake 0.4s ease;
+            border-color: var(--red, #ff3355) !important;
+        }
+
+        .recall-correct {
+            border-color: var(--green, #00ff88) !important;
+            box-shadow: 0 0 12px rgba(0,255,136,0.4);
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+  <div id="progress-bar" style="
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 9999;
+    display: flex; justify-content: center;
+    align-items: center; gap: 0.6rem;
+    padding: 0.4rem 1rem;
+    background: rgba(2,2,10,0.95);
+    border-bottom: 1px solid rgba(0,255,136,0.1);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.15em;
+  ">
+    <span id="pb1">LVL 1</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb2">LVL 2</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb3">LVL 3 <small onclick="replayL3Explain()" style="cursor:help; opacity:0.5">[?]</small></span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pbm">MINI</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb4">LVL 4</span>
+  </div>
+
+  <button id="skip-intro-btn" onclick="skipIntro()" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: transparent;
+    border: 1px solid rgba(0,255,136,0.3);
+    color: rgba(0,255,136,0.5);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    padding: 6px 14px;
+    cursor: pointer;
+    z-index: 999;
+    display: none;
+  ">SKIP ▶▶</button>
+
+    <div class="scanlines"></div>
+    <div class="grid-bg"></div>
+    <div id="particles-container"></div>
+
+    <!-- ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ -->
+    <div id="worked-example-screen" class="screen">
+        <div class="panel" style="max-width:600px; width:90%;">
+            <div class="panel-header">WORKED EXAMPLE</div>
+            <div class="panel-content">
+                <div id="example-area" style="text-align: left; font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem;"></div>
+                <button id="example-btn" class="continue-btn" onclick="showConfidence()">[ I UNDERSTAND ▶ ]</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 5: CONFIDENCE ═══ -->
+    <div id="confidence-screen" class="screen">
+        <div class="panel" style="max-width:500px; width:90%;">
+            <div class="panel-header">CONFIDENCE_CHECK</div>
+            <div class="panel-content">
+                <div style="color: var(--blue); margin-bottom: 2rem;">"Before you begin..."<br>How confident are you feeling?</div>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <button class="continue-btn visible" style="margin:0" onclick="saveConfidence(1)">1 — Not Sure</button>
+                    <button class="continue-btn visible" style="margin:0" onclick="saveConfidence(2)">2 — Somewhat</button>
+                    <button class="continue-btn visible" style="margin:0" onclick="saveConfidence(3)">3 — Ready</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ CONFIDENCE RESPONSE: HTML ═══ -->
+    <div id="confidence-response" class="screen">
+        <div class="modal-box" style="max-width: 520px; width: 92%; text-align: left;">
+            <div id="cr-label" style="font-size: 0.65rem; letter-spacing: 0.3em; margin-bottom: 1.2rem; opacity: 0.5;">SYSTEM_RESPONSE //</div>
+            <div id="cr-message" style="font-size: 1.1rem; line-height: 1.9; margin-bottom: 1.8rem; min-height: 4rem;"></div>
+            <div id="cr-hint-box" style="display: none; border: 1px dashed rgba(0,255,136,0.25); background: rgba(0,255,136,0.03); padding: 1rem 1.2rem; margin-bottom: 1.5rem; font-size: 0.82rem; line-height: 1.8; color: rgba(255,255,255,0.55);"></div>
+            <div id="cr-stat" style="display: none; font-size: 0.7rem; letter-spacing: 0.12em; margin-bottom: 1.5rem; opacity: 0.45;"></div>
+            <button id="cr-btn" style="display: none; width: 100%; background: transparent; border: 1px solid var(--green); color: var(--green); font-family: var(--font-main); font-size: 0.95rem; letter-spacing: 0.12em; padding: 0.9rem 1.5rem; cursor: pointer; transition: all 0.2s; text-align: center;"></button>
+        </div>
+    </div>
+
+    <!-- ═══ IMPROVEMENT 11: TRANSFER CHALLENGE ═══ -->
+    <div id="transfer-screen" class="screen">
+        <div class="panel" style="max-width:600px; width:90%;">
+            <div class="panel-header">TRANSFER PROTOCOL // APPLY YOUR KNOWLEDGE</div>
+            <div class="panel-content">
+                <div style="margin: 1.5rem 0; font-size: 1.1rem; line-height: 1.6; text-align: left;">"A weather drone stores current speed: <span class="cod">speed = 45</span>. To send this data back to base, it should call <span class="cod">transmit(____)</span>."</div>
+                <div class="options-grid">
+                    <button class="option-btn" onclick="checkTransfer(this, false)">A) 45</button>
+                    <button class="option-btn" onclick="checkTransfer(this, true)">B) speed</button>
+                    <button class="option-btn" onclick="checkTransfer(this, false)">C) "speed"</button>
+                    <button class="option-btn" onclick="checkTransfer(this, false)">D) 0</button>
+                </div>
+                <div id="transfer-feedback" style="margin-top: 1.5rem; min-height: 30px; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- INTRO SCREEN -->
+    <div id="intro-screen">
+        <div class="narrative-block" id="intro-narrative">
+            <!-- Lines will be injected here -->
+        </div>
+        <button class="continue-btn" id="intro-continue" onclick="advanceIntro()">CONTINUE ▶</button>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen">
+        <div class="header">
+            <div class="level-tag">LEVEL 03 // VARIABLE_STORAGE</div>
+            <div class="logic-points">LOGIC_POINTS: <span id="points-display">0</span></div>
+        </div>
+
+        <div class="panels-container">
+            <!-- LEFT: CODE -->
+            <div class="panel" id="code-panel">
+                <div class="panel-header">CODE_TERMINAL</div>
+                <div class="panel-content">
+                    <div class="code-container" id="code-content">
+                        <!-- Code lines -->
+                    </div>
+                    <div id="execution-narrative"
+                        style="color: var(--blue); margin-top: 1.5rem; font-style: italic; min-height: 3rem; text-align: center;">
+                    </div>
+                    <div class="controls">
+                        <div id="timer" class="timer-display">TIME: 0:45</div>
+                        <button class="ctrl-btn primary" id="run-btn" onclick="startExecution('run')" disabled>RUN
+                            ▶</button>
+                        <button class="ctrl-btn" id="step-btn" onclick="startExecution('step')" disabled>STEP ▶</button>
+                        <button class="ctrl-btn" id="replay-btn" onclick="replayExecution()"
+                            style="display: none;">REPLAY ↺</button>
+                        <button class="ctrl-btn primary" id="next-btn" onclick="nextPuzzle()"
+                            style="display: none;">NEXT ▶</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER: VISUAL -->
+            <div class="panel" id="visual-panel">
+                <div class="panel-header">VISUAL_STATE</div>
+                <div class="panel-content" style="display: flex; flex-direction: column;">
+                    <div class="visual-stage" id="visual-stage" style="flex-grow: 1;">
+                        <div class="variable-box" id="var-box" data-label="x"></div>
+                    </div>
+                    <div class="output-container" id="output-container">
+                        <div class="output-header">SYSTEM_OUTPUT:</div>
+                        <div id="output-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: FLOW -->
+            <div class="panel" id="flow-panel">
+                <div class="panel-header">LOGIC_FLOW</div>
+                <div class="panel-content" style="overflow-y: auto;">
+                    <div class="flow-diagram" id="flow-diagram">
+                        <!-- Flow nodes and arrows -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PUZZLE -->
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <h2 id="puzzle-title" style="color: var(--blue);">SYSTEM_PREDICTION</h2>
+            <p id="puzzle-desc" style="margin-top: 1rem;">What do you think will happen?</p>
+            <div class="puzzle-code" id="puzzle-code">
+                <!-- Puzzle code snippet -->
+            </div>
+            <div class="options-grid" id="options-grid">
+                <!-- Options -->
+            </div>
+            <div class="hint-text" id="hint-text"></div>
+        </div>
+    </div>
+
+    <!-- ═══ FIX L3-2: COMPLETION SCREEN — REAL STATS ═══ -->
+    <div id="completion-screen" style="display: none;
+       flex-direction:column; justify-content:center;
+       align-items:center; text-align:center; padding:2rem;">
+
+        <div style="font-size:0.65rem; color:rgba(0,212,255,0.4);
+                letter-spacing:0.3em; margin-bottom:0.5rem;">
+            SECTOR CLEARED //
+        </div>
+
+        <h1 style="color:var(--green); font-size:2.8rem;
+               text-shadow:var(--glow-green);
+               letter-spacing:0.15em; margin-bottom:0.3rem;">
+            LEVEL 3 COMPLETE
+        </h1>
+
+        <p style="color:var(--blue); letter-spacing:0.2em;
+              font-size:0.8rem; margin-bottom:1.5rem;">
+            VARIABLE STORAGE VERIFIED
+        </p>
+
+        <!-- Dynamic stats populated by showCompletionStats() -->
+        <div id="l3-stats-grid" style="
+      display:grid; grid-template-columns:1fr 1fr;
+      gap:1rem; max-width:420px; width:90%;
+      margin-bottom:1.5rem;">
+
+            <div style="background:rgba(0,212,255,0.05);
+                  border:1px solid rgba(0,212,255,0.15);
+                  padding:0.9rem; border-radius:4px;">
+                <div style="font-size:0.58rem;
+                    color:rgba(255,255,255,0.35);
+                    letter-spacing:0.2em;
+                    margin-bottom:0.4rem;">
+                    WRONG ATTEMPTS
+                </div>
+                <div id="l3-wrong"
+                    style="font-size:1.6rem; color:var(--green);">
+                    0
+                </div>
+            </div>
+
+            <div style="background:rgba(0,212,255,0.05);
+                  border:1px solid rgba(0,212,255,0.15);
+                  padding:0.9rem; border-radius:4px;">
+                <div style="font-size:0.58rem;
+                    color:rgba(255,255,255,0.35);
+                    letter-spacing:0.2em;
+                    margin-bottom:0.4rem;">
+                    CONCEPT SIGNAL
+                </div>
+                <div id="l3-signal" style="margin-top:4px;">—</div>
+            </div>
+
+        </div>
+
+        <!-- Signal area kept for existing logic -->
+        <div id="signal-area" style="display:none;"></div>
+
+        <!-- Narrative message -->
+        <div id="l3-complete-msg" style="
+      color:var(--blue); font-style:italic;
+      font-size:0.88rem; margin-bottom:1.5rem;
+      min-height:1.5rem; max-width:400px;
+      line-height:1.6;">
+        </div>
+
+        <!-- Drama box (used by completeLevel3 animation) -->
+        <div id="drama-box" style="margin-bottom:1.5rem;
+         min-height:60px;"></div>
+
+        <!-- Buttons -->
+        <div style="display:flex; flex-direction:column;
+                gap:0.8rem; align-items:center;
+                width:100%; max-width:360px;">
+            <button class="continue-btn visible"
+                    id="final-continue-btn"
+                    onclick="completeLevel3()"
+                    style="width:100%;">
+                CONTINUE ▶
+            </button>
+            <button onclick="window.location.href='hub.html'"
+                    style="background:transparent; border:none;
+                     color:rgba(0,212,255,0.3);
+                     font-family:var(--font-main);
+                     font-size:0.6rem; cursor:pointer;
+                     letter-spacing:0.1em;"
+                    onmouseover="this.style.color='var(--blue)'"
+                    onmouseout="this.style.color='rgba(0,212,255,0.3)'">
+                ↩ RETURN TO HUB
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ═══ IMPROVEMENT 2: EMOTIONAL MEMORY ═══ */
+        function getEmotionalMemory() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const l2 = state.levels?.[2] || {};
+            const wrong = l2.wrongAttempts || 0;
+            if (wrong === 0) return ["Two clean levels. Suspicious."];
+            if (wrong <= 2) return ["You're finding your footing."];
+            return ["The pattern is becoming clearer to you.", "Slowly."];
+        }
+
+        function getName() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            return state.playerName || "OPERATIVE";
+        }
+
+        /* ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ */
+        async function showWorkedExample() {
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('worked-example-screen').classList.add('active');
+            
+            // Show button immediately for intentional navigation
+            document.getElementById('example-btn').classList.add('visible');
+
+            const area = document.getElementById('example-area');
+            const lines = [
+                { text: "Observe this logic.", cls: '' },
+                { text: "y = 10", cls: 'cod hl' },
+                { text: "print(y)", cls: 'cod hl' },
+                { text: "The first line 'stores' 10 in y.", cls: '', pause: 300 },
+                { text: "The second line 'recalls' y to display 10.", cls: '', pause: 300 },
+                { text: "Result: 10", cls: 'hl', pause: 400 },
+                { text: "Now you face a similar challenge.", cls: 'dim' }
+            ];
+            for(let line of lines) {
+                const div = document.createElement('div');
+                div.className = line.cls;
+                area.appendChild(div);
+                await new Promise(r => {
+                    let i=0;
+                    const inv = setInterval(() => {
+                        div.textContent = line.text.slice(0, i); i++;
+                        if(i > line.text.length) { clearInterval(inv); r(); }
+                    }, 20);
+                });
+                await new Promise(r => setTimeout(r, line.pause || 300));
+            }
+        }
+
+        /* ═══ IMPROVEMENT 5: CONFIDENCE ═══ */
+        function showConfidence() {
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('confidence-screen').classList.add('active');
+        }
+        // ═══ CONFIDENCE RESPONSE: SAVE ═══
+        function saveConfidence(val) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            if(!state.levels) state.levels = {};
+            if(!state.levels[3]) state.levels[3] = {};
+            state.levels[3].confidenceRating = val;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+            
+            document.getElementById('confidence-screen').classList.remove('active');
+            showConfidenceResponse(val);
+        }
+
+        /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+        // ═══ RECALL FIX: showRecall ═══
+        function showRecall() {
+            recallAttempts = 0;
+            const overlay = document.getElementById('modal-overlay');
+            overlay.style.display = 'flex';
+            const box = overlay.querySelector('.modal-box');
+            // correctVal is determined by which puzzle
+            const correctVal = getCurrentRecallAnswer();
+            box.innerHTML = `
+              <h2 style="color:var(--blue);
+                         font-size:1rem;
+                         letter-spacing:0.1em;">
+                RECALL_PROTOCOL
+              </h2>
+              <p style="margin-top:0.8rem;
+                        color:rgba(255,255,255,0.6);
+                        font-size:0.88rem;">
+                What value did the variable hold at the end?
+              </p>
+              <div style="margin:1.5rem 0;">
+                <input type="text"
+                       id="recall-input"
+                       class="recall-input"
+                       autocomplete="off"
+                       onkeydown="if(event.key==='Enter')
+                                  confirmRecall('${correctVal}')">
+              </div>
+              <div id="recall-feedback"
+                   style="min-height:2.5rem;
+                          margin-bottom:1rem;
+                          font-size:0.82rem;
+                          line-height:1.6;">
+              </div>
+              <button class="continue-btn visible"
+                      style="font-size:0.9rem;"
+                      onclick="confirmRecall('${correctVal}')">
+                CONFIRM ▶
+              </button>
+            `;
+            document.getElementById('recall-input').focus();
+        }
+
+        // Add this helper to level3 so correctVal is
+        // always computed from current state:
+        function getCurrentRecallAnswer() {
+            // Return the correct answer for the current puzzle
+            return puzzles[currentPuzzleIdx]?.answer
+                || puzzles[currentPuzzleIdx]?.options[
+                puzzles[currentPuzzleIdx]?.correct
+                ]
+                || "5"; // fallback
+        }
+
+        // ═══ RECALL FIX: confirmRecall ═══
+        function confirmRecall(correctVal) {
+            const input    = document.getElementById('recall-input');
+            const feedback = document.getElementById('recall-feedback');
+
+            if (!input || !feedback) return;
+
+            const raw = input.value.trim();
+            const val = raw.toLowerCase();
+            const cv  = correctVal.toString().toLowerCase();
+
+            // ── EMPTY INPUT ───────────────────────────────────
+            if (raw === '') {
+                feedback.innerHTML =
+                    '<span style="color:var(--red,#ff3355)">' +
+                    'The system requires an answer.' +
+                    '</span>';
+                input.focus();
+                return; // do not count as attempt
+            }
+
+            // ── CORRECT ───────────────────────────────────────
+            if (val === cv) {
+                input.classList.remove('recall-shake');
+                input.classList.add('recall-correct');
+                feedback.innerHTML =
+                    '<span style="color:var(--green,#00ff88)">' +
+                    `Confirmed. ${correctVal} locked in. ✓` +
+                    '</span>';
+
+                // Save correct recall
+                const state = JSON.parse(
+                    localStorage.getItem('cer_state') || '{}'
+                );
+                if (!state.levels) state.levels = {};
+                if (!state.levels[3])
+                    state.levels[3] = {};
+                state.levels[3].typedRecall = true;
+                localStorage.setItem(
+                    'cer_state', JSON.stringify(state)
+                );
+
+                setTimeout(proceedAfterRecall, 800);
+                return;
+            }
+
+            // ── WRONG ─────────────────────────────────────────
+            recallAttempts++;
+
+            // Shake animation
+            input.classList.remove('recall-shake');
+            void input.offsetWidth; // force reflow
+            input.classList.add('recall-shake');
+            setTimeout(() =>
+                input.classList.remove('recall-shake'), 450);
+
+            if (recallAttempts >= 3) {
+                // Max attempts — show answer and move on
+                feedback.innerHTML =
+                    '<span style="color:var(--amber,#ffcc44)">' +
+                    `The system accepts your effort.<br>` +
+                    `Answer was: <strong style="color:var(--green)">` +
+                    `${correctVal}</strong>. Remember it.` +
+                    '</span>';
+
+                // Save failed recall
+                const state = JSON.parse(
+                    localStorage.getItem('cer_state') || '{}'
+                );
+                if (!state.levels) state.levels = {};
+                if (!state.levels[3])
+                    state.levels[3] = {};
+                state.levels[3].typedRecall = false;
+                localStorage.setItem(
+                    'cer_state', JSON.stringify(state)
+                );
+
+                // Disable input and button
+                input.disabled = true;
+                const btn = document.querySelector(
+                    '#modal-overlay .run-btn, ' +
+                    '#modal-overlay .continue-btn'
+                );
+                if (btn) btn.disabled = true;
+
+                setTimeout(proceedAfterRecall, 2200);
+
+            } else {
+                // Still has attempts left
+                const remaining = 3 - recallAttempts;
+                const hint = recallAttempts === 1
+                    ? `Not quite. The answer was: ` +
+                    `<strong style="color:var(--green)">` +
+                    `${correctVal}</strong>.<br>` +
+                    `Try typing it exactly, then confirm.`
+                    : `Still incorrect. ` +
+                    `Answer: <strong style="color:var(--green)">` +
+                    `${correctVal}</strong>.<br>` +
+                    `${remaining} attempt${remaining !== 1 ? 's' : ''} ` +
+                    `remaining — type it in.`;
+
+                feedback.innerHTML =
+                    `<span style="color:var(--amber,#ffcc44)">` +
+                    `${hint}</span>`;
+
+                // Clear and refocus
+                input.value = '';
+                setTimeout(() => input.focus(), 100);
+            }
+        }
+
+        // ═══ RECALL FIX: proceedAfterRecall ═══
+        function proceedAfterRecall() {
+            nextPuzzle();
+        }
+
+        function saveSignal(time) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const wrongCount = state.levels?.[3]?.wrongAttempts || 0;
+            let signal;
+            if (wrongCount === 0 && time < 12000) signal = 'STRONG';
+            else if (wrongCount === 0) signal = 'GOOD';
+            else if (wrongCount <= 2) signal = 'MODERATE';
+            else signal = 'WEAK';
+            
+            if (!state.levels) state.levels = {};
+            if (!state.levels[3]) state.levels[3] = {};
+            state.levels[3].signal = signal;
+            state.levels[3].responseTime = time;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+        }
+
+        function getSignalHTML(signal) {
+            const map = { 'STRONG': 5, 'GOOD': 4, 'MODERATE': 3, 'WEAK': 2 };
+            const count = map[signal] || 0;
+            const color = count >= 4 ? 'green' : (count === 3 ? 'amber' : 'red');
+            let html = `<div class="signal-bar">`;
+            for(let i=1; i<=5; i++) {
+                html += `<div class="sig-block ${i<=count ? 'active ' + color : ''}"></div>`;
+            }
+            html += ` <span style="margin-left:8px; font-size:0.7rem; color:var(--${color === 'green' ? 'green' : color})">${signal}</span></div>`;
+            return html;
+        }
+
+        /* ═══ IMPROVEMENT 7: ADAPTIVE DIFFICULTY ═══ */
+        let timerInterval;
+        function applyDifficulty() {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const diff = state.difficulty || 'normal';
+            if (diff === 'easy') {
+                document.getElementById('puzzle-desc').innerHTML += `<br><span style="color:var(--blue); opacity:0.6; font-size:0.8rem;">HINT: Focus on what stays the same between steps.</span>`;
+            } else if (diff === 'hard') {
+                startTimer(45);
+            }
+        }
+
+        function startTimer(seconds) {
+            const el = document.getElementById('timer');
+            el.classList.add('visible');
+            let left = seconds;
+            timerInterval = setInterval(() => {
+                left--;
+                const m = Math.floor(left/60);
+                const s = left%60;
+                el.textContent = `TIME: ${m}:${s < 10 ? '0' + s : s}`;
+                if(left <= 20) el.style.color = 'var(--amber)';
+                if(left <= 10) { el.style.color = 'var(--red)'; el.classList.add('flash'); }
+                if(left <= 0) {
+                    clearInterval(timerInterval);
+                    attempts++;
+                    const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+                    if(!state.levels[3]) state.levels[3] = {};
+                    state.levels[3].wrongAttempts = (state.levels[3].wrongAttempts || 0) + 1;
+                    localStorage.setItem('cer_state', JSON.stringify(state));
+                    alert("TIME EXPIRED. Resetting...");
+                    location.reload();
+                }
+            }, 1000);
+        }
+
+        /* ═══ IMPROVEMENT 8: REPLAY ═══ */
+        function replayL3Explain() { window.location.reload(); }
+
+        /* ═══ IMPROVEMENT 9: GHOST STATS ═══ */
+        function showGhostStats(correct) {
+            const seed = (3 * 1337 + 1 * 42);
+            const pct  = 45 + (seed % 38);
+            const avg  = 1 + (seed % 3);
+            const fb = document.getElementById('execution-narrative');
+            const stats = document.createElement('div');
+            stats.style.cssText = 'color: rgba(0,212,255,0.3); font-size: 0.68rem; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.9s;';
+            stats.textContent = correct 
+                ? `${pct}% of operatives solved this first try.` 
+                : `You're not alone — ${100-pct}% also struggled here. Average attempts: ${avg}`;
+            fb.appendChild(stats);
+            setTimeout(() => stats.style.opacity = '1', 900);
+        }
+
+        /* ═══ IMPROVEMENT 11: TRANSFER CHALLENGE ═══ */
+        function startTransfer() {
+            document.getElementById('completion-screen').style.display = 'none';
+            document.getElementById('transfer-screen').classList.add('active');
+        }
+        function checkTransfer(btn, isCorrect) {
+            const fb = document.getElementById('transfer-feedback');
+            if(isCorrect) {
+                btn.style.borderColor = 'var(--green)';
+                fb.innerHTML = '<span style="color: var(--green)">Transfer complete. Concept secured.</span>';
+                setTimeout(() => {
+                    document.getElementById('transfer-screen').classList.remove('active');
+                    showCompletion();
+                }, 1500);
+            } else {
+                btn.style.borderColor = 'var(--red)';
+                fb.innerHTML = '<span style="color: var(--amber)">Same logic as before. Think back.</span>';
+                setTimeout(() => {
+                    document.getElementById('transfer-screen').classList.remove('active');
+                    showCompletion();
+                }, 1500);
+            }
+        }
+
+        // --- DATA ---
+        const introStages = [
+            ["You’ve learned how to send messages.", "But repeating values… is not efficient."],
+            ["The system has a better way.", "It can store information… and reuse it."],
+            ["This is called a variable.", "It holds a value."]
+        ];
+
+        const puzzles = [
+            {
+                code: "x = 5\nprint(x)",
+                targetLines: [1],
+                options: ["x", "5", "\"x\"", "Error"],
+                correct: 1,
+                hints: [
+                    "Think about what x contains.",
+                    "The system looks inside the box.",
+                    "x stores the number 5."
+                ]
+            },
+            {
+                code: "x = 3\nprint(x)\nprint(x)",
+                targetLines: [1, 2],
+                options: ["3 3", "3", "x x", "Error"],
+                correct: 0,
+                hints: [
+                    "Think about what x contains.",
+                    "The same value is used each time.",
+                    "x does not change unless told to."
+                ]
+            }
+        ];
+
+        const levelSequences = [
+            [
+                { codeRow: 0, type: 'assign', var: 'x', label: 'x = 5', flow: 'Create x' },
+                { codeRow: 0, type: 'assign_val', var: 'x', val: 5, flow: 'Store 5 in x' },
+                { codeRow: 1, type: 'print', var: 'x', val: 5, label: 'print(x)', flow: 'Print x → 5' }
+            ],
+            [
+                { codeRow: 0, type: 'assign', var: 'x', label: 'x = 3', flow: 'Create x' },
+                { codeRow: 0, type: 'assign_val', var: 'x', val: 3, flow: 'Store 3 in x' },
+                { codeRow: 1, type: 'print', var: 'x', val: 3, label: 'print(x)', flow: 'Print x → 3' },
+                { codeRow: 2, type: 'print', var: 'x', val: 3, label: 'print(x)', flow: 'Print x → 3' }
+            ]
+        ];
+
+        let currentPuzzleIdx = 0;
+        let currentStepIdx   = 0;
+        let currentIntroStage = 0;
+        let points = 0;
+        let attempts = 0;
+        let executionMode = 'run';
+        let isExecuting = false;
+        let puzzleStartTime;
+        // ═══ RECALL FIX: recallAttempts COUNTER ═══
+        let recallAttempts = 0;
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const mem = getEmotionalMemory();
+            introStages[0].unshift(...mem);
+
+            // ═══ FIX L3-1: cssText WIPES PROGRESS BAR ═══
+            document.getElementById('pb3').style.color = '#00ff88';
+            document.getElementById('pb3').style.textShadow = '0 0 8px #00ff88';
+
+            (function markCompleted() {
+              const state = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+              );
+              const map = {
+                pb1: state.levels?.[1]?.completed,
+                pb2: state.levels?.[2]?.completed,
+                pb3: state.levels?.[3]?.completed,
+                pbm: state.levels?.mini?.completed,
+                pb4: state.levels?.[4]?.completed
+              };
+              Object.entries(map).forEach(([id, done]) => {
+                if (done) {
+                  const el = document.getElementById(id);
+                  if (el) el.textContent = el.textContent + ' ✓';
+                }
+              });
+            })();
+
+            // Lazy particles
+            document.addEventListener('click', lazyParticles, { once: true });
+            setTimeout(lazyParticles, 3000);
+
+            document.getElementById('game-screen').style.display = 'flex';
+            showIntroStage(0);
+        });
+
+        function createParticles() {
+            const container = document.getElementById('particles-container');
+            for (let i = 0; i < 30; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = Math.random() * 3 + 2;
+                p.style.width = `${size}px`;
+                p.style.height = `${size}px`;
+                p.style.left = `${Math.random() * 100}vw`;
+                p.style.animationDuration = `${Math.random() * 10 + 10}s`;
+                p.style.animationDelay = `${Math.random() * 5}s`;
+                container.appendChild(p);
+            }
+            showIntroStage(0);
+        }
+
+        let particlesCreated = false;
+        function lazyParticles() {
+            if (!particlesCreated) {
+                createParticles();
+                particlesCreated = true;
+            }
+        }
+
+        function skipIntro() {
+            // Fill all intro text instantly, advance to puzzle
+            currentIntroStage = introStages.length;
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('worked-example-screen').classList.remove('active');
+            document.getElementById('confidence-screen').classList.remove('active');
+            document.getElementById('game-screen').style.display = 'flex';
+            document.getElementById('skip-intro-btn').style.display = 'none';
+            lazyParticles();
+            startLevel();
+        }
+
+        // --- INTRO LOGIC ---
+        async function showIntroStage(idx) {
+            const container = document.getElementById('intro-narrative');
+            const btn = document.getElementById('intro-continue');
+            container.innerHTML = '';
+            btn.classList.remove('visible');
+
+            const lines = introStages[idx];
+            for (let line of lines) {
+                const el = document.createElement('div');
+                el.className = 'text-line';
+                let text = line.replace('{name}', getName());
+                container.appendChild(el);
+                await typeText(el, text);
+                el.classList.add('visible');
+                await new Promise(r => setTimeout(r, 150));
+            }
+            btn.classList.add('visible');
+            document.getElementById('skip-intro-btn').style.display = 'block';
+        }
+
+        function typeText(el, text) {
+            return new Promise(resolve => {
+                let i = 0;
+                const interval = setInterval(() => {
+                    el.textContent = text.slice(0, i) + (i < text.length ? '_' : '');
+                    i++;
+                    if (i > text.length) {
+                        clearInterval(interval);
+                        el.textContent = text;
+                        resolve();
+                    }
+                }, 12);
+
+                const skipHandler = () => {
+                    clearInterval(interval);
+                    el.textContent = text;
+                    document.body.removeEventListener('click', skipHandler);
+                    document.body.removeEventListener('touchstart', skipHandler);
+                    resolve();
+                };
+                document.body.addEventListener('click', skipHandler);
+                document.body.addEventListener('touchstart', skipHandler);
+            });
+        }
+
+        function advanceIntro() {
+            currentIntroStage++;
+            if (currentIntroStage < introStages.length) {
+                showIntroStage(currentIntroStage);
+            } else {
+                showWorkedExample();
+            }
+        }
+
+        // --- LEVEL LOGIC ---
+        function startLevel() {
+            document.getElementById('intro-screen').style.display = 'none';
+            document.getElementById('skip-intro-btn').style.display = 'none';
+            setupPuzzleModal();
+        }
+
+        function setupPuzzleBackground() {
+            const puzzle = puzzles[currentPuzzleIdx];
+
+            // Sync Main Screen Code
+            const mainCode = document.getElementById('code-content');
+            mainCode.innerHTML = puzzle.code.split('\n').map(line => `<div class="code-row">${line}</div>`).join('');
+
+            // Sync Flow Diagram
+            const flowDiagram = document.getElementById('flow-diagram');
+            flowDiagram.innerHTML = '';
+
+            // Add Start Node
+            flowDiagram.innerHTML += '<div class="flow-node" id="node-start">Start</div>';
+
+            levelSequences[currentPuzzleIdx].forEach((step, idx) => {
+                flowDiagram.innerHTML += '<div class="flow-arrow">↓</div>';
+                flowDiagram.innerHTML += `<div class="flow-node" id="node-${idx}">${step.flow}</div>`;
+            });
+
+            // Add End Node
+            flowDiagram.innerHTML += '<div class="flow-arrow">↓</div>';
+            flowDiagram.innerHTML += `<div class="flow-node" id="node-end">End</div>`;
+
+            // Highlight Start initially
+            document.getElementById('node-start').classList.add('active');
+
+            // Reset Visual
+            document.getElementById('var-box').textContent = '';
+            document.getElementById('var-box').classList.remove('glow');
+            document.getElementById('output-list').innerHTML = '';
+        }
+
+        function setupPuzzleModal() {
+            const puzzle = puzzles[currentPuzzleIdx];
+            puzzleStartTime = Date.now();
+            const modal = document.getElementById('modal-overlay');
+            const codeEl = document.getElementById('puzzle-code');
+            const optionsEl = document.getElementById('options-grid');
+            const hintEl = document.getElementById('hint-text');
+
+            codeEl.innerHTML = '';
+            optionsEl.innerHTML = '';
+            hintEl.textContent = '';
+
+            const lines = puzzle.code.split('\n');
+            lines.forEach((line, idx) => {
+                const div = document.createElement('div');
+                div.className = 'puzzle-code-line';
+                div.textContent = line;
+                if (puzzle.targetLines.includes(idx)) div.classList.add('highlight');
+                codeEl.appendChild(div);
+            });
+
+            puzzle.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => checkAnswer(idx);
+                
+                // Add hover effect linkage
+                btn.onmouseenter = () => {
+                    puzzle.targetLines.forEach(lineIdx => {
+                        const lineEl = codeEl.querySelectorAll('.puzzle-code-line')[lineIdx];
+                        if (lineEl) lineEl.classList.add('highlight');
+                    });
+                };
+                btn.onmouseleave = () => {
+                    puzzle.targetLines.forEach(lineIdx => {
+                        const lineEl = codeEl.querySelectorAll('.puzzle-code-line')[lineIdx];
+                        if (lineEl) lineEl.classList.remove('highlight');
+                    });
+                };
+                optionsEl.appendChild(btn);
+            });
+
+            document.getElementById('modal-overlay').style.display = 'flex';
+        }
+
+        function checkAnswer(idx) {
+            const puzzle = puzzles[currentPuzzleIdx];
+            const btns = document.getElementById('options-grid').children;
+            const hintEl = document.getElementById('hint-text');
+            const userAnswer = puzzle.options[idx];
+
+            if (idx === puzzle.correct) {
+                btns[idx].classList.add('correct');
+                hintEl.textContent = "Correct. The system accesses the stored value.";
+                points += 5;
+                updatePoints();
+                setTimeout(() => {
+                    document.getElementById('modal-overlay').style.display = 'none';
+                    enableControls();
+                }, 1500);
+            } else {
+                btns[idx].classList.add('wrong');
+                attempts++;
+                
+                // ═══ CONFIDENCE RESPONSE: AUTO-HINT ═══
+                const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+                const wrongCount = (state.levels?.[3]?.wrongAttempts || 0) + 1; // current attempt
+                if (window._supportMode && wrongCount === 1) {
+                    if (hintEl) {
+                        hintEl.textContent = puzzle.hints?.[0] || 'Trace the variable from where it was set.';
+                        hintEl.style.color = '#ffcc44';
+                    }
+                }
+
+                showMistakeFeedback(userAnswer, puzzle);
+            }
+        }
+
+        function showMistakeFeedback(userAnswer, puzzle) {
+            const title = document.getElementById('puzzle-title');
+            const desc = document.getElementById('puzzle-desc');
+            const codeEl = document.getElementById('puzzle-code');
+            const optionsEl = document.getElementById('options-grid');
+            const hintEl = document.getElementById('hint-text');
+
+            title.textContent = "SYSTEM_ERROR";
+            title.style.color = "#ff4444";
+
+            let actualOutputStr = puzzle.options[puzzle.correct].split(' ').map(o => `> ${o}`).join('<br>');
+
+            desc.innerHTML = `You expected: <span style="color:#ff4444">${userAnswer}</span><br><br>Actual output:<br><span style="color:var(--green)">${actualOutputStr}</span>`;
+
+            codeEl.style.display = 'none';
+            optionsEl.innerHTML = '';
+
+            if (currentPuzzleIdx === 1) {
+                hintEl.innerHTML = "Each line runs independently.<br>Each print produces its own output.";
+            } else {
+                hintEl.innerHTML = "Variables store values.<br>The system accesses the stored value.";
+            }
+            hintEl.style.color = "var(--blue)";
+
+            const ackBtn = document.createElement('button');
+            ackBtn.className = 'option-btn wrong';
+            ackBtn.textContent = "ACKNOWLEDGE ▶";
+            ackBtn.style.gridColumn = "span 2";
+            ackBtn.onclick = () => {
+                document.getElementById('modal-overlay').style.display = 'none';
+
+                // Reset modal back to normal state for next time
+                title.textContent = "SYSTEM_PREDICTION";
+                title.style.color = "var(--blue)";
+                desc.textContent = "What do you think will happen?";
+                codeEl.style.display = 'block';
+
+                enableControls();
+            };
+            optionsEl.appendChild(ackBtn);
+        }
+
+        function enableControls() {
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('step-btn').disabled = false;
+            currentStepIdx = 0;
+        }
+
+        async function startExecution(mode) {
+            if (isExecuting) return;
+            isExecuting = true;
+            executionMode = mode;
+
+            document.getElementById('run-btn').disabled = true;
+            document.getElementById('step-btn').disabled = (mode === 'run');
+
+            if (mode === 'run') {
+                while (currentStepIdx < levelSequences[currentPuzzleIdx].length) {
+                    await executeStep();
+                    await new Promise(r => setTimeout(r, 600));
+                }
+                finishSequence();
+            } else {
+                await executeStep();
+                if (currentStepIdx >= levelSequences[currentPuzzleIdx].length) {
+                    finishSequence();
+                } else {
+                    isExecuting = false;
+                }
+            }
+        }
+
+        async function executeStep() {
+            const seq = levelSequences[currentPuzzleIdx];
+            const step = seq[currentStepIdx];
+
+            // Highlight Code
+            const rows = document.getElementById('code-content').children;
+            for (let r of rows) r.classList.remove('active');
+            if (rows[step.codeRow]) rows[step.codeRow].classList.add('active');
+
+            // Highlight Flow Diagram
+            const flowNodes = document.querySelectorAll('.flow-node');
+            flowNodes.forEach(n => n.classList.remove('active'));
+            const currentNode = document.getElementById(`node-${currentStepIdx}`);
+            if (currentNode) currentNode.classList.add('active');
+
+            // Visual Animation
+            if (step.type === 'assign') {
+                await new Promise(r => setTimeout(r, 600)); // Just flow/code highlight delay
+            } else if (step.type === 'assign_val') {
+                await animateAssignment(step.var, step.val);
+            } else if (step.type === 'print') {
+                await animatePrint(step.var, step.val);
+            }
+
+            currentStepIdx++;
+        }
+
+        function animateAssignment(variable, value) {
+            return new Promise(resolve => {
+                const stage = document.getElementById('visual-stage');
+                const box = document.getElementById('var-box');
+                const valEl = document.createElement('div');
+                valEl.className = 'falling-value';
+                valEl.textContent = value;
+                valEl.style.top = '-100px';
+                stage.appendChild(valEl);
+
+                setTimeout(() => {
+                    valEl.style.transform = 'translateY(100px)';
+                    setTimeout(() => {
+                        valEl.style.opacity = '0';
+                        box.textContent = value;
+                        box.classList.add('glow');
+                        setTimeout(() => {
+                            valEl.remove();
+                            resolve();
+                        }, 500);
+                    }, 800);
+                }, 50);
+            });
+        }
+
+        function animatePrint(variable, value) {
+            return new Promise(resolve => {
+                const box = document.getElementById('var-box');
+                const pulse = document.createElement('div');
+                pulse.className = 'output-pulse';
+                pulse.textContent = value;
+                box.appendChild(pulse);
+
+                pulse.style.animation = 'pulse-out 0.8s ease-out forwards';
+
+                setTimeout(() => {
+                    pulse.remove();
+                    // Append to output
+                    const outList = document.getElementById('output-list');
+                    const item = document.createElement('div');
+                    item.className = 'output-item';
+                    item.textContent = `> ${value}`;
+                    outList.appendChild(item);
+
+                    resolve();
+                }, 800);
+            });
+        }
+
+        function finishSequence() {
+            isExecuting = false;
+            document.getElementById('run-btn').style.display = 'none';
+            document.getElementById('step-btn').style.display = 'none';
+
+            document.getElementById('replay-btn').style.display = 'block';
+            document.getElementById('next-btn').style.display = 'block';
+
+            const narr = document.getElementById('execution-narrative');
+            if (currentPuzzleIdx === 1) {
+                narr.innerHTML = "Each step is executed in order.<br>Each print creates its own output.";
+            } else {
+                narr.innerHTML = "Variables store values.<br>The system accesses the stored value.";
+            }
+
+            const flowNodes = document.querySelectorAll('.flow-node');
+            flowNodes.forEach(n => n.classList.remove('active'));
+            const endNode = document.getElementById('node-end');
+            if (endNode) endNode.classList.add('active');
+        }
+
+        function replayExecution() {
+            // Reset Code Panel
+            const rows = document.getElementById('code-content').children;
+            for (let r of rows) r.classList.remove('active');
+
+            // Reset Flow Diagram
+            const flowNodes = document.querySelectorAll('.flow-node');
+            flowNodes.forEach(n => n.classList.remove('active'));
+            document.getElementById('node-start').classList.add('active');
+
+            // Clear Output
+            document.getElementById('output-list').innerHTML = '';
+
+            // Reset Visual
+            document.getElementById('var-box').textContent = '';
+            document.getElementById('var-box').classList.remove('glow');
+
+            // Reset Controls
+            document.getElementById('replay-btn').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('run-btn').style.display = 'block';
+            document.getElementById('step-btn').style.display = 'block';
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('step-btn').disabled = false;
+
+            document.getElementById('execution-narrative').innerHTML = '';
+
+            currentStepIdx = 0;
+            startExecution('run');
+        }
+
+        function nextPuzzle() {
+            if (currentPuzzleIdx === 0) {
+                currentPuzzleIdx++;
+
+                // Restore UI for puzzle
+                document.getElementById('replay-btn').style.display = 'none';
+                document.getElementById('next-btn').style.display = 'none';
+                document.getElementById('run-btn').style.display = 'block';
+                document.getElementById('step-btn').style.display = 'block';
+                document.getElementById('execution-narrative').innerHTML = '';
+
+                const title = document.getElementById('puzzle-title');
+                title.textContent = "SYSTEM_PREDICTION";
+                title.style.color = "var(--blue)";
+                document.getElementById('puzzle-desc').textContent = "What do you think will happen?";
+                document.getElementById('puzzle-code').style.display = 'block';
+
+                setupPuzzleBackground();
+                setupPuzzleModal();
+            } else {
+                showCompletion();
+            }
+        }
+
+        function updatePoints() {
+            document.getElementById('points-display').textContent = points;
+        }
+
+        function showCompletion() {
+            if(timerInterval) clearInterval(timerInterval);
+            document.getElementById('modal-overlay').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'none';
+            // ═══ FIX L3-3: POPULATE STATS ON COMPLETION ═══
+            showCompletionStats();
+            document.getElementById('completion-screen').style.display = 'flex';
+
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const signal = state.levels?.[3]?.signal || 'WEAK';
+            // document.getElementById('signal-area').innerHTML = `<div style="font-size:0.7rem; color:var(--blue); opacity:0.6; margin-bottom:10px;">CONCEPT SIGNAL:</div>` + getSignalHTML(signal);
+        }
+
+        // ═══ FIX L3-3: showCompletionStats ═══
+        function showCompletionStats() {
+            const state = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+            );
+            const wrong = state.levels?.[3]?.wrongAttempts || 0;
+            const signal = state.levels?.[3]?.signal || 'MODERATE';
+
+            // Wrong attempts
+            document.getElementById('l3-wrong').textContent = wrong;
+
+            // Signal HTML (reuse existing getSignalHTML if available)
+            const sigEl = document.getElementById('l3-signal');
+            if (typeof getSignalHTML === 'function') {
+                sigEl.innerHTML = getSignalHTML(signal);
+            } else {
+                sigEl.textContent = signal;
+                sigEl.style.color = signal === 'STRONG' || signal === 'GOOD'
+                    ? 'var(--green)' : signal === 'MODERATE'
+                        ? 'var(--amber)' : 'var(--red)';
+            }
+
+            // Message based on performance
+            const msgs = {
+                0: "No mistakes. The system is satisfied.",
+                1: "One slip. Recovered cleanly.",
+                2: "Two attempts. Still a solid breach."
+            };
+            const msg = msgs[wrong] ||
+                `${wrong} attempts. Variables are tricky. Keep going.`;
+            document.getElementById('l3-complete-msg').textContent = msg;
+        }
+
+        function completeLevel3() {
+            const btn = document.getElementById('final-continue-btn');
+            btn.style.display = 'none';
+
+            // Step 1: Flicker
+            const header = document.querySelector('.level-tag');
+            header.textContent = "ANOMALY DETECTED";
+            header.style.color = "#ff3355";
+            document.body.style.animation = 'glitch 0.2s infinite';
+            
+            // Step 2: New lines
+            const box = document.getElementById('drama-box');
+            box.innerHTML = `
+                <div class="text-line visible hl">"Wait."</div>
+                <div class="text-line visible">"Something is wrong with the system."</div>
+                <div class="text-line visible amb">"This wasn't supposed to happen."</div>
+            `;
+            
+            setTimeout(() => {
+                box.innerHTML += `
+                    <div class="text-line visible cod" style="margin-top:1rem">MINI CHALLENGE INCOMING</div>
+                    <div class="text-line visible">Prepare yourself.</div>
+                `;
+            }, 2500);
+
+            setTimeout(() => {
+                const state = JSON.parse(
+                  localStorage.getItem('cer_state') || '{}'
+                );
+                if (!state.levels) state.levels = {};
+                state.levels[3] = {
+                  completed: true,
+                  completedAt: Date.now(),
+                  wrongAttempts: state.levels[3]?.wrongAttempts || 0,
+                  signal: state.levels[3]?.signal,
+                  responseTime: state.levels[3]?.responseTime,
+                  confidenceRating: state.levels[3]?.confidenceRating,
+                  typedRecall: state.levels[3]?.typedRecall
+                };
+                state.currentLevel = 'mini';
+
+                // Difficulty for mini
+                const l1Wrong = state.levels[1]?.wrongAttempts || 0;
+                const l2Wrong = state.levels[2]?.wrongAttempts || 0;
+                const l3Wrong = state.levels[3]?.wrongAttempts || 0;
+                const totalWrong = l1Wrong + l2Wrong + l3Wrong;
+                state.difficulty = totalWrong === 0 ? 'hard' : (totalWrong <= 3 ? 'normal' : 'easy');
+
+                localStorage.setItem('cer_state', JSON.stringify(state));
+                window.location.href = 'mini_challenge.html';
+            }, 5000);
+        }
+
+        // ═══ CONFIDENCE RESPONSE: SHOW ═══
+        async function showConfidenceResponse(val) {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const name = state.playerName || 'OPERATIVE';
+
+            const l1Wrong = state.levels?.[1]?.wrongAttempts || 0;
+            const l2Wrong = state.levels?.[2]?.wrongAttempts || 0;
+            const l3Wrong = state.levels?.[3]?.wrongAttempts || 0;
+            const totalWrong = l1Wrong + l2Wrong + l3Wrong;
+
+            document.getElementById('confidence-response').classList.add('active');
+
+            const msgEl = document.getElementById('cr-message');
+            const hintEl = document.getElementById('cr-hint-box');
+            const statEl = document.getElementById('cr-stat');
+            const btn = document.getElementById('cr-btn');
+            const label = document.getElementById('cr-label');
+
+            const cfg = getResponseConfig(val, name, totalWrong);
+
+            label.style.color = cfg.color;
+            label.textContent = cfg.label;
+
+            msgEl.style.color = cfg.color;
+            await typewriterCR(msgEl, cfg.message, 20);
+
+            if (val === 1) {
+                hintEl.style.display = 'block';
+                hintEl.innerHTML = getLevelHint();
+
+                if (totalWrong > 0) {
+                    statEl.style.display = 'block';
+                    statEl.textContent = `SYSTEM LOG: ${totalWrong} mistake${totalWrong !== 1 ? 's' : ''} recorded across previous levels.`;
+                }
+            }
+
+            if (cfg.autoDelay) {
+                setTimeout(proceedToGame, cfg.autoDelay);
+            } else {
+                btn.style.display = 'block';
+                btn.textContent = cfg.btnText;
+                btn.style.borderColor = cfg.color;
+                btn.style.color = cfg.color;
+                btn.onmouseover = () => {
+                    btn.style.background = cfg.color;
+                    btn.style.color = 'var(--bg-color, #02020a)';
+                };
+                btn.onmouseout = () => {
+                    btn.style.background = 'transparent';
+                    btn.style.color = cfg.color;
+                };
+                btn.onclick = proceedToGame;
+            }
+        }
+
+        // ═══ CONFIDENCE RESPONSE: CONFIG ═══
+        function getResponseConfig(val, name, totalWrong) {
+            if (val === 1) {
+                let msg;
+                if (totalWrong === 0) {
+                    msg = `Two levels without a mistake, ${name}.\nBut uncertainty now.\nVariables are a new kind of thinking.\n\nThe system has prepared a reminder.`;
+                } else if (totalWrong <= 3) {
+                    msg = `You have made ${totalWrong} mistake${totalWrong !== 1 ? 's' : ''} so far, ${name}.\nVariables trip people up at first.\nThat is normal.\n\nRead the reminder below.`;
+                } else {
+                    msg = `The pattern has been difficult, ${name}.\nVariables will feel different.\nThey are not a trick.\n\nRead carefully before entering.`;
+                }
+                return {
+                    label: 'UNCERTAINTY_DETECTED //',
+                    message: msg,
+                    color: '#ffcc44',
+                    btnText: "I'M READY. TAKE ME IN ▶",
+                    autoDelay: 0
+                };
+            } else if (val === 2) {
+                const msgs = [
+                    `Partial confidence, ${name}.\nThat is honest.\nThe system respects honest.\n\nThe rest will come as you go.`,
+                    `Not certain. Not lost.\nThat is the right place to be.\n\nStep forward, ${name}.`,
+                    `${name}. Somewhat is enough.\nThe system does not need certainty.\nIt needs presence.\n\nYou are about to find out the rest.`
+                ];
+                return {
+                    label: 'PARTIAL_CONFIDENCE //',
+                    message: msgs[Math.floor(Math.random() * msgs.length)],
+                    color: 'var(--blue)',
+                    btnText: "LET'S DO THIS ▶",
+                    autoDelay: 0
+                };
+            } else {
+                const msgs = [
+                    `Confidence confirmed, ${name}.\nNo hesitation detected.\n\nEntering in 2 seconds...`,
+                    `Strong signal, ${name}.\nThe system is ready.\n\nInitiating now...`,
+                    `${name}. Ready.\nThe system acknowledges.\n\nBeginning sequence...`
+                ];
+                return {
+                    label: 'CONFIDENCE_CONFIRMED //',
+                    message: msgs[Math.floor(Math.random() * msgs.length)],
+                    color: 'var(--green)',
+                    btnText: '',
+                    autoDelay: 2000
+                };
+            }
+        }
+
+        // ═══ CONFIDENCE RESPONSE: HINT ═══
+        function getLevelHint() {
+            return `
+                <div style="color:var(--green); font-size:0.75rem; letter-spacing:0.15em; margin-bottom:0.6rem;">CONCEPT REMINDER</div>
+                A variable stores a value.<br>
+                <code style="color:var(--green)">name = "AGENT"</code> means name holds "AGENT".<br><br>
+                When asked what a variable contains, find where it was last set.<br>
+                That is the answer.<br><br>
+                <span style="opacity:0.55">Top to bottom. Last assignment wins.</span>
+            `;
+        }
+
+        // ═══ CONFIDENCE RESPONSE: TYPEWRITER ═══
+        function typewriterCR(el, text, speed) {
+            return new Promise(resolve => {
+                el.innerHTML = '';
+                let i = 0;
+                const interval = setInterval(() => {
+                    const slice = text.slice(0, i);
+                    el.innerHTML = slice.replace(/\n/g, '<br>');
+                    i++;
+                    if (i > text.length) {
+                        clearInterval(interval);
+                        el.innerHTML = text.replace(/\n/g, '<br>');
+                        resolve();
+                    }
+                }, speed || 20);
+            });
+        }
+
+        // ═══ CONFIDENCE RESPONSE: PROCEED ═══
+        function proceedToGame() {
+            document.getElementById('confidence-response').classList.remove('active');
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const conf = state.levels?.[3]?.confidenceRating;
+            if (conf === 1) applySupportiveMode();
+            applyDifficulty();
+            setupPuzzleBackground();
+            startLevel();
+        }
+
+        // ═══ CONFIDENCE RESPONSE: SUPPORT MODE ═══
+        function applySupportiveMode() {
+            const strip = document.createElement('div');
+            strip.id = 'support-strip';
+            strip.style.cssText = `
+                position: fixed;
+                bottom: 0; left: 0; right: 0;
+                z-index: 800;
+                background: rgba(2,2,10,0.95);
+                border-top: 1px solid rgba(255,204,68,0.2);
+                color: rgba(255,204,68,0.6);
+                font-family: var(--font-main);
+                font-size: 0.62rem;
+                letter-spacing: 0.14em;
+                padding: 6px 1.5rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            `;
+            strip.innerHTML = `
+                <span>${getSupportStripText()}</span>
+                <span onclick="document.getElementById('support-strip').style.display='none'" style="cursor:pointer; opacity:0.4; font-size:0.7rem;">✕ DISMISS</span>
+            `;
+            document.body.appendChild(strip);
+
+            if (typeof timerInterval !== 'undefined') {
+                clearInterval(timerInterval);
+            }
+            const timerEl = document.getElementById('timer');
+            if (timerEl) timerEl.style.display = 'none';
+
+            window._supportMode = true;
+        }
+
+        function getSupportStripText() {
+            return 'SUPPORT: variable stores a value — last assignment is the current value';
+        }
+    </script>
+</body>
+</html>

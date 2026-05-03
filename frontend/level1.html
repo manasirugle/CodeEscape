@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Escape Room — Level 1: Logic Verification</title>
+  <meta name="description" content="Level 1 of the Code Escape Room. Prove your logic to survive inside the digital system." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet" />
+  <style>
+    /* ======== RESET & BASE ======== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:        #00ff88;
+      --green-dim:    #00cc6a;
+      --red:          #ff3355;
+      --amber:        #ffcc44;
+      --bg:           #020812;
+      --glass:        rgba(4, 18, 44, 0.72);
+      --glass-border: rgba(0,255,136,0.38);
+      --text:         #cde8d6;
+      --text-dim:     #4f8a68;
+      --blue:         #00d4ff;
+      --font:         'Share Tech Mono', 'Courier New', monospace;
+      --font-vt:      'VT323', monospace;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--green);
+      font-family: var(--font);
+      overflow: hidden;
+      user-select: none;
+      padding-top: 2rem;
+    }
+
+    /* ═══ IMPROVEMENT 6 & 10: RECALL & SIGNAL ═══ */
+    .recall-input {
+      background: transparent; border: 1px solid var(--green);
+      color: var(--green); font-family: var(--font);
+      font-size: 0.9rem; padding: 0.4rem; width: 100px;
+      text-align: center; outline: none; margin-top: 1rem;
+      animation: btnPop 0.3s ease;
+    }
+    .signal-bar { display: flex; gap: 4px; margin-top: 5px; justify-content: center; }
+    .sig-block { width: 12px; height: 18px; border: 1px solid rgba(0,255,136,0.2); }
+    .sig-block.active.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .sig-block.active.amber { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+    .sig-block.active.red   { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+    /* ======== SCANLINES ======== */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.14) 3px, rgba(0,0,0,0.14) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ======== GRID BG ======== */
+    .grid-bg {
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,255,136,0.032) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,136,0.032) 1px, transparent 1px);
+      background-size: 44px 44px;
+      animation: gridPulse 7s ease-in-out infinite;
+    }
+    @keyframes gridPulse { 0%,100% { opacity:.55; } 50% { opacity:.95; } }
+
+    /* ======== PARTICLES ======== */
+    .particles { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+    .particle {
+      position: absolute; width: 2px; height: 2px;
+      background: var(--green); border-radius: 50%;
+      animation: floatUp linear infinite; opacity: 0;
+    }
+    @keyframes floatUp {
+      0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+      10%  { opacity: .55; }
+      90%  { opacity: .15; }
+      100% { transform: translateY(-10px) scale(1.4); opacity: 0; }
+    }
+
+    /* ======== APP ======== */
+    #app {
+      position: relative; z-index: 10;
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ======== SCREENS ======== */
+    .screen {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.55s ease;
+      z-index: 50;
+    }
+    .screen.active { opacity: 1; pointer-events: all; }
+
+    /* ======== BOOT TERMINAL ======== */
+    #intro-screen { flex-direction: column; padding: 2rem; }
+    .terminal-lines {
+      font-family: var(--font);
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--green);
+      text-align: left;
+      max-width: 580px; width: 100%;
+    }
+    .terminal-line {
+      line-height: 2.1; opacity: 0;
+      white-space: nowrap; overflow: hidden;
+    }
+    .terminal-line.visible { opacity: 1; }
+    .terminal-line.typing  { border-right: 2px solid var(--green); animation: blinkCaret 0.7s step-end infinite; }
+
+    /* ======== GLASS PANEL ======== */
+    .glass-panel {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      backdrop-filter: blur(14px);
+      padding: clamp(2.2rem, 5vw, 3.8rem) clamp(2rem, 6vw, 4.2rem);
+      max-width: 700px; width: 95%;
+      text-align: center;
+      box-shadow:
+        0 0 24px rgba(0,255,136,.12),
+        0 0 70px rgba(0,255,136,.05),
+        inset 0 0 40px rgba(0,10,30,.6);
+      animation: panelGlow 4.5s ease-in-out infinite;
+    }
+    @keyframes panelGlow {
+      0%,100% { box-shadow: 0 0 24px rgba(0,255,136,.12), 0 0 70px rgba(0,255,136,.05), inset 0 0 40px rgba(0,10,30,.6); }
+      50%      { box-shadow: 0 0 44px rgba(0,255,136,.26), 0 0 100px rgba(0,255,136,.10), inset 0 0 40px rgba(0,10,30,.6); }
+    }
+
+    /* ======== NARRATIVE / EXPLAIN PANEL FADE-IN ======== */
+    #narrative-screen .glass-panel,
+    #explain-screen .glass-panel {
+      opacity: 0; transform: translateY(16px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    #narrative-screen.active .glass-panel,
+    #explain-screen.active .glass-panel { opacity: 1; transform: translateY(0); }
+
+    /* ======== BLOCK CONTAINER ======== */
+    /* Lines accumulate here; fades between blocks */
+    .block-area {
+      min-height: 150px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 0.45rem;
+      transition: opacity 0.34s ease;
+    }
+
+    /* ======== BLOCK LINES ======== */
+    .bl {
+      font-family: var(--font);
+      font-size: clamp(0.96rem, 2.3vw, 1.12rem);
+      color: var(--text);
+      line-height: 1.85;
+      width: 100%;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(5px);
+      transition: opacity 0.38s ease, transform 0.38s ease;
+    }
+    .bl.in    { opacity: 1; transform: translateY(0); }
+    /* cursor on active typewriter line */
+    .bl.typing { border-right: 2px solid var(--green); animation: blinkCaret 0.7s step-end infinite; }
+
+    /* variants */
+    .bl.hl  { color: var(--green); text-shadow: 0 0 14px var(--green); font-size: clamp(1rem, 2.5vw, 1.18rem); }
+    .bl.amb { color: var(--amber); text-shadow: 0 0 10px rgba(255,204,68,.4); }
+    .bl.cod {
+      font-family: var(--font-vt);
+      font-size: clamp(1.9rem, 5.5vw, 3rem);
+      color: #fff;
+      text-shadow: 0 0 12px rgba(0,255,136,.35);
+      letter-spacing: 0.14em;
+      line-height: 1.3;
+    }
+
+    /* ======== DIVIDER ======== */
+    .divider {
+      width: 100%; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      margin: 1.1rem 0; opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .divider.show { opacity: 0.42; }
+
+    /* ======== BUTTONS ======== */
+    .neon-btn {
+      display: none;         /* hidden by default; JS shows */
+      margin-top: 1.8rem;
+      padding: 0.82rem 2.3rem;
+      border: 2px solid var(--green);
+      background: transparent;
+      color: var(--green);
+      font-family: var(--font);
+      font-size: clamp(0.82rem, 2vw, 0.96rem);
+      letter-spacing: 0.14em;
+      cursor: pointer;
+      border-radius: 5px;
+      position: relative; overflow: hidden;
+      transition: color 0.28s ease, box-shadow 0.28s ease;
+      animation: none;
+    }
+    .neon-btn.show {
+      display: inline-block;
+      animation: btnPop 0.38s ease both;
+    }
+    @keyframes btnPop {
+      from { opacity:0; transform:translateY(7px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .neon-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--green);
+      transform: scaleX(0); transform-origin: left;
+      transition: transform 0.3s ease;
+      z-index: -1;
+    }
+    .neon-btn:hover::before { transform: scaleX(1); }
+    .neon-btn:hover { color: #020812; box-shadow: 0 0 28px rgba(0,255,136,.55), 0 0 60px rgba(0,255,136,.2); }
+    .neon-btn:active { transform: scale(0.97); }
+
+    /* small Continue pill */
+    .pill-btn {
+      padding: 0.52rem 1.55rem;
+      font-size: 0.8rem;
+      border-width: 1px;
+      letter-spacing: 0.12em;
+      margin-top: 1.8rem;
+    }
+
+    /* ======== PUZZLE SCREEN ======== */
+    #puzzle-screen .glass-panel {
+      opacity: 0; transform: scale(0.93);
+      transition: opacity 0.45s ease, transform 0.45s ease;
+    }
+    #puzzle-screen.active .glass-panel { opacity: 1; transform: scale(1); }
+
+    .puzzle-header {
+      font-family: var(--font-vt);
+      font-size: clamp(1.5rem, 4vw, 2.1rem);
+      letter-spacing: 0.3em;
+      color: var(--green);
+      text-shadow: 0 0 22px var(--green);
+      margin-bottom: 0.35rem;
+      animation: flicker 6s ease-in-out infinite;
+    }
+    @keyframes flicker {
+      0%,19%,21%,23%,25%,54%,56%,100% { opacity:1; }
+      20%,24%,55% { opacity:.25; }
+    }
+    .puzzle-subheader {
+      font-size: 0.7rem; color: var(--text-dim);
+      letter-spacing: 0.22em; margin-bottom: 2rem;
+    }
+    .pattern-display {
+      font-family: var(--font-vt);
+      font-size: clamp(2.2rem, 7vw, 3.8rem);
+      color: #fff; letter-spacing: 0.18em;
+      margin: 1.4rem 0;
+      text-shadow: 0 0 10px rgba(0,255,136,.35);
+    }
+    .question-mark {
+      color: var(--green);
+      text-shadow: 0 0 28px var(--green);
+      animation: qPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes qPulse {
+      0%,100% { text-shadow: 0 0 28px var(--green); }
+      50%      { text-shadow: 0 0 55px var(--green), 0 0 90px rgba(0,255,136,.35); }
+    }
+
+    .options-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0.9rem; margin-top: 1.4rem;
+    }
+    @media (max-width: 480px) { .options-grid { grid-template-columns: 1fr; } }
+
+    .option-btn {
+      padding: 0.9rem 1.1rem;
+      border: 1px solid rgba(0,255,136,.3);
+      background: rgba(0,255,136,.04);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: clamp(0.85rem, 2vw, 0.98rem);
+      cursor: pointer; border-radius: 6px;
+      position: relative; overflow: hidden;
+      letter-spacing: 0.05em;
+      transition: border-color .22s, color .22s, background .22s, box-shadow .22s;
+    }
+    .option-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(0,255,136,.09);
+      transform: scaleX(0); transform-origin: left;
+      transition: transform .22s ease;
+    }
+    .option-btn:not(:disabled):hover { border-color: var(--green); color: #fff; }
+    .option-btn:not(:disabled):hover::before { transform: scaleX(1); }
+    .option-btn:not(:disabled):active { transform: scale(.97); }
+    .option-btn.correct {
+      border-color: var(--green);
+      background: rgba(0,255,136,.14); color: var(--green);
+      box-shadow: 0 0 22px rgba(0,255,136,.45), inset 0 0 14px rgba(0,255,136,.08);
+      pointer-events: none;
+    }
+    .option-btn.wrong {
+      border-color: var(--red);
+      background: rgba(255,51,85,.09); color: var(--red);
+      box-shadow: 0 0 14px rgba(255,51,85,.35);
+      pointer-events: none;
+    }
+    .option-btn:disabled:not(.correct):not(.wrong) { opacity:.28; pointer-events:none; }
+
+    /* ---- feedback ---- */
+    #feedback-box {
+      margin-top: 1.3rem; min-height: 72px;
+      font-family: var(--font);
+      font-size: clamp(.82rem, 2vw, .92rem);
+      line-height: 2; letter-spacing: .02em;
+    }
+    #feedback-box .hint-line {
+      opacity: 0; transform: translateY(6px);
+      transition: opacity .4s ease, transform .4s ease;
+    }
+    #feedback-box .hint-line.show { opacity:1; transform:translateY(0); }
+    #feedback-box.success { color: var(--green); text-shadow: 0 0 8px rgba(0,255,136,.5); }
+    #feedback-box.error   { color: #ff8899; text-shadow: 0 0 6px rgba(255,51,85,.3); }
+
+    /* attempt badge */
+    #attempt-badge {
+      position: absolute; top: 1rem; right: 1.2rem;
+      font-size: .62rem; letter-spacing: .15em;
+      color: var(--text-dim); opacity: 0; transition: opacity .4s;
+    }
+    #attempt-badge.show { opacity: 1; }
+
+    /* ======== COMPLETE SCREEN ======== */
+    #complete-screen .glass-panel {
+      opacity: 0; transform: scale(.88);
+      transition: opacity .65s ease, transform .65s ease;
+    }
+    #complete-screen.active .glass-panel { opacity:1; transform:scale(1); }
+
+    .complete-badge {
+      font-family: var(--font-vt);
+      font-size: clamp(1.8rem, 6vw, 3.2rem);
+      letter-spacing: .3em; color: var(--green);
+      text-shadow: 0 0 35px var(--green), 0 0 70px rgba(0,255,136,.25);
+      margin-bottom: .3rem;
+      animation: completePulse 2.2s ease-in-out infinite;
+    }
+    @keyframes completePulse {
+      0%,100% { text-shadow: 0 0 35px var(--green), 0 0 70px rgba(0,255,136,.25); }
+      50%      { text-shadow: 0 0 55px var(--green), 0 0 110px rgba(0,255,136,.45); }
+    }
+    .complete-sub {
+      font-size: .72rem; color: var(--green-dim);
+      letter-spacing: .35em; margin-bottom: 1.5rem;
+    }
+
+    /* ======== GLITCH OVERLAY ======== */
+    #glitch-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      pointer-events: none; display: none;
+    }
+    #glitch-overlay.active { display: block; }
+    .glitch-bar { position: absolute; width: 100%; opacity: 0; }
+
+    /* ======== STATUS BAR ======== */
+    #status-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: .45rem 1.5rem;
+      font-size: .62rem; color: var(--text-dim);
+      letter-spacing: .15em;
+      border-top: 1px solid rgba(0,255,136,.08);
+      background: rgba(2,8,18,.85);
+      z-index: 200;
+    }
+    #blink-cursor {
+      display: inline-block; width: 8px; height: 13px;
+      background: var(--green); vertical-align: middle; margin-left: 4px;
+      animation: blinkCaret .8s step-end infinite;
+    }
+
+    /* ======== SHARED KEYFRAMES ======== */
+    @keyframes blinkCaret { 50% { background: transparent; border-color: transparent; } }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%  { transform: translateX(-5px); }
+      40%  { transform: translateX(5px); }
+      60%  { transform: translateX(-4px); }
+      80%  { transform: translateX(4px); }
+    }
+    .shake { animation: shake .38s ease; }
+  </style>
+</head>
+<body>
+
+  <div id="progress-bar" style="
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 9999;
+    display: flex; justify-content: center;
+    align-items: center; gap: 0.6rem;
+    padding: 0.4rem 1rem;
+    background: rgba(2,2,10,0.95);
+    border-bottom: 1px solid rgba(0,255,136,0.1);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem; letter-spacing: 0.15em;
+  ">
+    <span id="pb1">LVL 1 <small onclick="replayL1Explain()" style="cursor:help; opacity:0.5">[?]</small></span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb2">LVL 2</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb3">LVL 3</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pbm">MINI</span>
+    <span style="color:#1a3a2a">──</span>
+    <span id="pb4">LVL 4</span>
+  </div>
+
+<div class="grid-bg"></div>
+<div class="particles" id="particles"></div>
+<div id="glitch-overlay"></div>
+
+<div id="status-bar">
+  <span>SYS://ESCAPE_PROTOCOL/LEVEL_01</span>
+  <span id="status-clock">— — : — — : — —</span>
+  <span>LOGIC_ENGINE v1.0<span id="blink-cursor"></span></span>
+</div>
+
+<div id="app">
+
+  <!-- ═══ IMPROVEMENT 1: IDENTITY SCREEN ═══ -->
+  <div id="identity-screen" class="screen active" style="z-index: 1000; background: var(--bg);">
+    <div class="glass-panel">
+      <div class="puzzle-header" style="color: var(--red); text-shadow: 0 0 20px var(--red); font-size: 2rem;">IDENTITY UNVERIFIED</div>
+      <div class="puzzle-subheader">Enter operative codename to proceed:</div>
+      <div style="margin: 2rem 0;">
+        <input type="text" id="player-name-input" placeholder="AGENT_???" maxlength="16" 
+               style="background: transparent; border: none; border-bottom: 2px solid var(--green); 
+                      color: var(--green); font-family: var(--font); font-size: 1.5rem; text-align: center; 
+                      outline: none; text-transform: uppercase; width: 100%;">
+      </div>
+      <button class="neon-btn show" onclick="saveIdentity()">[ INITIALIZE ▶ ]</button>
+    </div>
+  </div>
+
+  <!-- ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ -->
+  <div id="worked-example-screen" class="screen">
+    <div class="glass-panel" id="example-panel">
+      <div class="puzzle-header" style="font-size: 1.2rem; color: var(--amber);">WORKED EXAMPLE</div>
+      <div class="divider show"></div>
+      <div class="block-area" id="example-block" style="min-height: 200px;"></div>
+      <div class="divider" id="example-divider"></div>
+      <button class="neon-btn" id="example-continue-btn" onclick="showConfidence()">[ I UNDERSTAND ▶ ]</button>
+    </div>
+  </div>
+
+  <!-- ═══ IMPROVEMENT 5: CONFIDENCE RATING ═══ -->
+  <div id="confidence-screen" class="screen">
+    <div class="glass-panel">
+      <div style="color: var(--blue); margin-bottom: 2rem; font-size: 1.1rem; line-height: 1.6;">"Before you begin..."<br>How confident are you feeling?</div>
+      <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <button class="neon-btn pill-btn show" onclick="saveConfidence(1)">1 — Not Sure</button>
+        <button class="neon-btn pill-btn show" onclick="saveConfidence(2)">2 — Somewhat</button>
+        <button class="neon-btn pill-btn show" onclick="saveConfidence(3)">3 — Ready</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ IMPROVEMENT 11: TRANSFER CHALLENGE ═══ -->
+  <div id="transfer-screen" class="screen">
+    <div class="glass-panel">
+      <div class="puzzle-header" style="font-size: 1rem; color: var(--blue);">TRANSFER PROTOCOL // APPLY YOUR KNOWLEDGE</div>
+      <div class="divider show"></div>
+      <div style="margin: 1.5rem 0; font-size: 1.1rem; line-height: 1.6;">"A program runs at 9am, 11am, 1pm, 3pm..."<br>When does it run next?</div>
+      <div class="options-grid">
+        <button class="option-btn" onclick="checkTransfer(this, false)">A) 4pm</button>
+        <button class="option-btn" onclick="checkTransfer(this, true)">B) 5pm</button>
+        <button class="option-btn" onclick="checkTransfer(this, false)">C) 6pm</button>
+        <button class="option-btn" onclick="checkTransfer(this, false)">D) 7pm</button>
+      </div>
+      <div id="transfer-feedback" style="margin-top: 1.5rem; min-height: 30px; font-size: 0.9rem;"></div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 1: BOOT TERMINAL ===== -->
+  <div id="intro-screen" class="screen active">
+    <div class="terminal-lines" id="terminal-output"></div>
+  </div>
+
+  <!-- ===== SCREEN 2: NARRATIVE ===== -->
+  <div id="narrative-screen" class="screen">
+    <div class="glass-panel" id="narrative-panel">
+      <div class="block-area" id="story-block"></div>
+      <div class="divider" id="story-divider"></div>
+      <button class="neon-btn pill-btn" id="continue-story-btn" onclick="narrativePlayer.btnClick()">Continue ▶</button>
+      <button class="neon-btn"          id="begin-btn"          onclick="startPuzzle()">[ BEGIN VERIFICATION ]</button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 3: PUZZLE ===== -->
+  <div id="puzzle-screen" class="screen">
+    <div class="glass-panel" style="position:relative">
+      <div id="attempt-badge">ATTEMPT: <span id="attempt-num">1</span></div>
+      <div class="puzzle-header">LOGIC TEST INITIATED</div>
+      <div class="puzzle-subheader">SEQUENCE ANALYSIS // PATTERN RECOGNITION UNIT</div>
+      <div class="divider show"></div>
+      <div class="pattern-display">
+        2 → 4 → 6 → 8 → <span class="question-mark">?</span>
+      </div>
+      <div class="divider show"></div>
+      <div class="options-grid">
+        <button class="option-btn" id="opt-a" onclick="checkAnswer(this,false)">A)&nbsp;&nbsp;9</button>
+        <button class="option-btn" id="opt-b" onclick="checkAnswer(this,true)">B)&nbsp;&nbsp;10</button>
+        <button class="option-btn" id="opt-c" onclick="checkAnswer(this,false)">C)&nbsp;&nbsp;12</button>
+        <button class="option-btn" id="opt-d" onclick="checkAnswer(this,false)">D)&nbsp;&nbsp;14</button>
+      </div>
+      <div id="feedback-box"></div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 4: EXPLANATION + BRIDGE ===== -->
+  <div id="explain-screen" class="screen">
+    <div class="glass-panel" id="explain-panel">
+      <div class="block-area" id="explain-block"></div>
+      <div class="divider" id="explain-divider"></div>
+      <button class="neon-btn pill-btn" id="continue-explain-btn" onclick="explainPlayer.btnClick()">Continue ▶</button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 5: LEVEL COMPLETE ===== -->
+  <div id="complete-screen" class="screen">
+    <div class="glass-panel" id="complete-panel">
+      <div class="complete-badge">LEVEL 1 COMPLETE</div>
+      <div class="complete-sub">LOGIC VERIFIED ✓</div>
+      <div class="block-area" id="complete-block" style="min-height:100px"></div>
+      <div class="divider" id="complete-divider"></div>
+      <button class="neon-btn" id="continue-final-btn" onclick="continueGame()">[ CONTINUE → LEVEL 2 ]</button>
+      <div style="margin-top: 1rem;">
+        <button class="neon-btn pill-btn show" onclick="replayL1Explain()" style="font-size: 0.7rem; opacity: 0.5; padding: 0.3rem 0.8rem;">↺ REPLAY EXPLANATION</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+/* ================================================================
+   UTILS
+================================================================ */
+const $ = id => document.getElementById(id);
+const pad = v => String(v).padStart(2,'0');
+
+document.getElementById('pb1').style.cssText = 
+  'color:#00ff88; text-shadow:0 0 8px #00ff88;';
+
+(function markCompleted() {
+  const state = JSON.parse(
+    localStorage.getItem('cer_state') || '{}'
+  );
+  const map = {
+    pb1: state.levels?.[1]?.completed,
+    pb2: state.levels?.[2]?.completed,
+    pb3: state.levels?.[3]?.completed,
+    pbm: state.levels?.mini?.completed,
+    pb4: state.levels?.[4]?.completed
+  };
+  Object.entries(map).forEach(([id, done]) => {
+    if (done) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = el.textContent + ' ✓';
+    }
+  });
+})();
+
+/* clock */
+function updateClock() {
+  const n = new Date();
+  $('status-clock').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+}
+setInterval(updateClock, 1000); updateClock();
+
+/* particles */
+(function() {
+  const c = $('particles');
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div'); p.className = 'particle';
+    p.style.left             = Math.random() * 100 + 'vw';
+    p.style.animationDuration = (7 + Math.random() * 14) + 's';
+    p.style.animationDelay   = (Math.random() * 12) + 's';
+    p.style.width = p.style.height = (Math.random() > .5 ? 2 : 3) + 'px';
+    c.appendChild(p);
+  }
+})();
+
+/* ================================================================
+   SCREEN SWITCH
+================================================================ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+/* ═══ IMPROVEMENT 1: PLAYER IDENTITY ═══ */
+function saveIdentity() {
+  const nameInput = $('player-name-input').value.trim().toUpperCase() || "OPERATIVE";
+  const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+  state.playerName = nameInput;
+  localStorage.setItem('cer_state', JSON.stringify(state));
+  
+  glitchTransition(() => {
+    $('identity-screen').classList.remove('active');
+    runBoot();
+  });
+}
+
+function getName() {
+  const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+  return state.playerName || "OPERATIVE";
+}
+
+/* ═══ IMPROVEMENT 4: WORKED EXAMPLE ═══ */
+function showWorkedExample() {
+  showScreen('worked-example-screen');
+  const exampleLines = [
+    { text: "Observe this pattern.", cls: '' },
+    { text: "1 → 3 → 5 → 7 → ?", cls: 'cod' },
+    { text: "The gap between each number...", cls: '', pauseAfter: 1500 },
+    { text: "+2   +2   +2   +2", cls: 'amb', pauseAfter: 1500 },
+    { text: "Therefore: 7 + 2 = 9", cls: 'hl', pauseAfter: 2000 },
+    { text: "Now you face a similar challenge.", cls: 'dim' }
+  ];
+  
+  const player = createBlockPlayer(
+    [{ lines: exampleLines, action: 'begin' }],
+    $('example-block'),
+    $('example-divider'),
+    null,
+    $('example-continue-btn'),
+    null
+  );
+  player.start();
+  // Show button immediately for intentional navigation
+  $('example-continue-btn').classList.add('show');
+  
+  // Panel click skips to end
+  $('example-panel').onclick = (e) => {
+    if(e.target.tagName !== 'BUTTON') {
+      player.panelClick();
+    }
+  };
+}
+
+/* ═══ IMPROVEMENT 5: CONFIDENCE RATING ═══ */
+function showConfidence() { showScreen('confidence-screen'); }
+function saveConfidence(val) {
+  const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+  if(!state.levels) state.levels = {};
+  if(!state.levels[1]) state.levels[1] = {};
+  state.levels[1].confidenceRating = val;
+  localStorage.setItem('cer_state', JSON.stringify(state));
+  startPuzzle();
+}
+
+/* ═══ IMPROVEMENT 6: TYPED RECALL ═══ */
+function showRecall(btn) {
+  const container = btn.parentElement.parentElement;
+  const recallDiv = document.createElement('div');
+  recallDiv.id = 'recall-container';
+  recallDiv.style.marginTop = '1.5rem';
+  recallDiv.innerHTML = `
+    <div style="font-size: 0.8rem; color: var(--blue); margin-bottom: 0.5rem;">Lock it in. Type the answer you just chose:</div>
+    <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
+      <input type="text" id="recall-input" class="recall-input" maxlength="2">
+      <button class="neon-btn show pill-btn" onclick="confirmRecall()" style="margin-top:1rem">CONFIRM ▶</button>
+    </div>
+  `;
+  container.appendChild(recallDiv);
+  $('recall-input').focus();
+}
+
+function confirmRecall() {
+  const val = $('recall-input').value.trim();
+  const isCorrectRecall = (val === "10");
+  const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+  state.levels[1].typedRecall = isCorrectRecall;
+  localStorage.setItem('cer_state', JSON.stringify(state));
+
+  if (!isCorrectRecall) {
+    $('recall-input').style.borderColor = 'var(--amber)';
+    const msg = document.createElement('div');
+    msg.style.color = 'var(--amber)';
+    msg.style.fontSize = '0.7rem';
+    msg.style.marginTop = '0.5rem';
+    msg.textContent = 'The system noticed the hesitation. Moving forward anyway.';
+    $('recall-input').parentElement.parentElement.appendChild(msg);
+    setTimeout(() => glitchTransition(() => startExplain()), 1500);
+  } else {
+    glitchTransition(() => startExplain());
+  }
+}
+
+/* ═══ IMPROVEMENT 8: REPLAY ═══ */
+function replayL1Explain() {
+  glitchTransition(() => {
+    showScreen('explain-screen');
+    startExplain();
+  });
+}
+
+/* ═══ IMPROVEMENT 9: GHOST STATS ═══ */
+function showGhostStats(correct) {
+  const seed = (1 * 1337 + 1 * 42);
+  const pct  = 45 + (seed % 38);
+  const avg  = 1 + (seed % 3);
+  const fb = $('feedback-box');
+  const stats = document.createElement('div');
+  stats.style.cssText = 'color: rgba(0,255,136,0.3); font-size: 0.68rem; letter-spacing: 0.1em; opacity: 0; transition: opacity 0.9s; margin-top: 0.5rem;';
+  stats.textContent = correct 
+    ? `${pct}% of operatives solved this first try.` 
+    : `You're not alone — ${100-pct}% also struggled here. Average attempts: ${avg}`;
+  fb.appendChild(stats);
+  setTimeout(() => stats.style.opacity = '1', 900);
+}
+
+/* ═══ IMPROVEMENT 10: SIGNAL STRENGTH ═══ */
+function saveSignal(time) {
+  let signal;
+  if (wrongCount === 0 && time < 8000) signal = 'STRONG';
+  else if (wrongCount === 0) signal = 'GOOD';
+  else if (wrongCount <= 2) signal = 'MODERATE';
+  else signal = 'WEAK';
+  
+  const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+  if (!state.levels) state.levels = {};
+  if (!state.levels[1]) state.levels[1] = {};
+  
+  state.levels[1].signal = signal;
+  state.levels[1].responseTime = time;
+  localStorage.setItem('cer_state', JSON.stringify(state));
+}
+
+function getSignalHTML(signal) {
+  const map = { 'STRONG': 5, 'GOOD': 4, 'MODERATE': 3, 'WEAK': 2 };
+  const count = map[signal] || 0;
+  const color = count >= 4 ? 'green' : (count === 3 ? 'amber' : 'red');
+  let html = `<div class="signal-bar">`;
+  for(let i=1; i<=5; i++) {
+    html += `<div class="sig-block ${i<=count ? 'active ' + color : ''}"></div>`;
+  }
+  html += ` <span style="margin-left:8px; font-size:0.7rem; color:var(--${color === 'green' ? 'green' : color})">${signal}</span></div>`;
+  return html;
+}
+
+/* ═══ IMPROVEMENT 11: TRANSFER CHALLENGE ═══ */
+function startTransfer() { showScreen('transfer-screen'); }
+function checkTransfer(btn, isCorrect) {
+  const fb = $('transfer-feedback');
+  const allBtns = document.querySelectorAll('#transfer-screen .option-btn');
+  allBtns.forEach(b => b.disabled = true);
+
+  if(isCorrect) {
+    btn.classList.add('correct');
+    fb.innerHTML = '<span style="color: var(--green)">Transfer complete. Concept secured.</span>';
+    setTimeout(showComplete, 1200);
+  } else {
+    btn.classList.add('wrong');
+    fb.innerHTML = '<span style="color: var(--amber)">Logic deviation. Transitioning with caution...</span>';
+    setTimeout(() => {
+       showComplete();
+    }, 1500);
+  }
+}
+
+/* ================================================================
+   GLITCH TRANSITION
+================================================================ */
+function glitchTransition(cb) {
+  const ov = $('glitch-overlay');
+  ov.innerHTML = ''; ov.classList.add('active');
+  if (!$('glitch-kf')) {
+    const s = document.createElement('style'); s.id = 'glitch-kf';
+    s.textContent = `@keyframes glitchBar {
+      0%   { transform:scaleX(0) translateX(-30px); opacity:1; }
+      40%  { transform:scaleX(1.2) translateX(8px);  opacity:.85; }
+      70%  { transform:scaleX(.5) translateX(-12px);  opacity:.5; }
+      100% { transform:scaleX(0) translateX(18px);  opacity:0; }
+    }`;
+    document.head.appendChild(s);
+  }
+  for (let i = 0; i < 14; i++) {
+    const b = document.createElement('div'); b.className = 'glitch-bar';
+    b.style.cssText = `top:${Math.random()*100}vh;
+      height:${1+Math.random()*7}px;
+      animation:glitchBar ${60+Math.random()*100}ms ${Math.random()*200}ms ease both;
+      background:${Math.random()>.5?'var(--green)':'#00ccff'};`;
+    ov.appendChild(b);
+  }
+  $('app').style.animation = 'shake .28s ease';
+  setTimeout(() => $('app').style.animation = '', 280);
+  setTimeout(() => { ov.classList.remove('active'); if (cb) cb(); }, 370);
+}
+
+/* ================================================================
+   TYPEWRITER w/ cancellation token
+================================================================ */
+function typeChar(el, text, i, speed, token, done) {
+  if (token.cancelled) {
+    el.textContent = text;
+    el.classList.remove('typing');
+    if (done) done(true);
+    return;
+  }
+  if (i === 0) el.classList.add('typing');
+  if (i >= text.length) {
+    el.classList.remove('typing');
+    setTimeout(() => { if (done) done(false); }, 80);
+    return;
+  }
+  el.textContent = text.slice(0, i + 1);
+  setTimeout(() => typeChar(el, text, i + 1, speed, token, done),
+    speed + Math.random() * 18);
+}
+
+/* ================================================================
+   BLOCK PLAYER
+   ──────────────────────────────────────────────────────────────
+   scriptBlocks format:
+   [
+     {
+       lines: [
+         { text, cls, pauseAfter? },   // cls: hl | amb | cod | ''
+         ...
+       ],
+       action?: 'begin' | 'complete'   // overrides Continue btn
+     },
+     ...
+   ]
+================================================================ */
+function createBlockPlayer(scriptBlocks, blockEl, dividerEl, continueBtn, actionBtn, onDone) {
+  let bIdx    = 0;   // current block index
+  let lIdx    = 0;   // current line index within block
+  let typing  = false;
+  let ready   = false;
+  let token   = null;
+
+  /* --- helpers --- */
+  function showBtn(btn) {
+    if (!btn) return;
+    btn.classList.remove('show');
+    void btn.offsetWidth;                 // force reflow → restart animation
+    btn.classList.add('show');
+  }
+  function hideBtn(btn) { if (btn) btn.classList.remove('show'); }
+
+  /* --- start / restart the current block --- */
+  function startBlock() {
+    ready  = false;
+    typing = false;
+    hideBtn(continueBtn);
+    hideBtn(actionBtn);
+    dividerEl.classList.remove('show');
+
+    if (bIdx > 0) {
+      blockEl.style.opacity = '0';
+      setTimeout(renderBlock, 360);
+    } else {
+      renderBlock();
+    }
+  }
+
+  function renderBlock() {
+    blockEl.innerHTML = '';
+    blockEl.style.opacity = '1';
+    lIdx = 0;
+    playLine();
+  }
+
+  /* --- type one line, then schedule the next --- */
+  function playLine() {
+    const block = scriptBlocks[bIdx];
+    if (!block) { if (onDone) onDone(); return; }
+
+    if (lIdx >= block.lines.length) {
+      /* all lines done → show button */
+      typing = false;
+      setTimeout(() => {
+        dividerEl.classList.add('show');
+        if (block.action === 'begin') {
+          showBtn(actionBtn);
+          /* ready stays false — user must click the explicit button */
+        } else if (block.action === 'complete') {
+          if (onDone) onDone();
+        } else {
+          ready = true;
+          showBtn(continueBtn);
+        }
+      }, 850);
+      return;
+    }
+
+    const lineData = block.lines[lIdx];
+    const el = document.createElement('div');
+    el.className = 'bl' + (lineData.cls ? ' ' + lineData.cls : '');
+    blockEl.appendChild(el);
+    setTimeout(() => el.classList.add('in'), 30);   // slide-in
+
+    /* typewriter */
+    typing = true;
+    token  = { cancelled: false };
+    const spd = lineData.cls === 'cod' ? 15 : 22;
+
+    typeChar(el, lineData.text, 0, spd, token, (skipped) => {
+      if (skipped) {
+        skipRemainingLines();
+      } else {
+        typing = false;
+        lIdx++;
+        /* pause before next line */
+        const pause = lineData.pauseAfter
+          ?? ((lineData.cls === 'hl' || lineData.cls === 'amb' || lineData.cls === 'cod')
+              ? 1100 : 700);
+        setTimeout(playLine, pause);
+      }
+    });
+  }
+
+  /* called when user skips mid-type → reveal the rest instantly */
+  function skipRemainingLines() {
+    typing = false;
+    const block = scriptBlocks[bIdx];
+    let i = lIdx + 1;            // current line already completed by token cancel
+    while (i < block.lines.length) {
+      const ld = block.lines[i];
+      const el = document.createElement('div');
+      el.className = 'bl' + (ld.cls ? ' ' + ld.cls : '');
+      el.textContent = ld.text;
+      blockEl.appendChild(el);
+      setTimeout(((e) => () => e.classList.add('in'))(el), (i - lIdx) * 65);
+      i++;
+    }
+    setTimeout(() => {
+      dividerEl.classList.add('show');
+      if (block.action === 'begin') {
+        showBtn(actionBtn);
+      } else if (block.action === 'complete') {
+        if (onDone) onDone();
+      } else {
+        ready = true;
+        showBtn(continueBtn);
+      }
+    }, 450);
+  }
+
+  /* --- advance / skip unified logic --- */
+  function advance() {
+    if (typing) {
+      /* first click during typing → skip to block end */
+      if (token) token.cancelled = true;
+      return;
+    }
+    if (!ready) return;
+
+    /* advance to next block */
+    ready = false;
+    hideBtn(continueBtn);
+    bIdx++;
+    if (bIdx >= scriptBlocks.length) { if (onDone) onDone(); return; }
+    startBlock();
+  }
+
+  return {
+    start    : startBlock,
+    btnClick : advance,          /* called by Continue btn */
+    panelClick: advance,         /* called by panel background click */
+  };
+}
+
+/* ================================================================
+   BOOT TYPEWRITER
+================================================================ */
+const bootLines = ['signal_detected...', 'scanning...', 'anomaly found', 'source: USER'];
+
+function runBoot() {
+  const box = $('terminal-output');
+  let idx = 0;
+  function next() {
+    if (idx >= bootLines.length) { setTimeout(startNarrative, 750); return; }
+    const el = document.createElement('div'); el.className = 'terminal-line';
+    box.appendChild(el);
+    const t = { cancelled: false };
+    setTimeout(() => typeChar(el, bootLines[idx++], 0, 20, t, next), idx === 1 ? 40 : 180);
+  }
+  next();
+}
+
+/* ================================================================
+   NARRATIVE SCRIPT — 3 blocks
+================================================================ */
+const narrativeScript = [
+  {
+    lines: [
+      { text: `"You weren't expected, ${getName()}..."`,    cls: '',   pauseAfter: 800 },
+      { text: '"But you\'ve been detected."',  cls: '' },
+    ]
+  },
+  {
+    lines: [
+      { text: '"This system does not recognize you."', cls: '',   pauseAfter: 700 },
+      { text: `"...yet, ${getName()}."`,                             cls: 'hl', pauseAfter: 900 },
+    ]
+  },
+  {
+    lines: [
+      { text: '"To remain, you must prove something."', cls: '',   pauseAfter: 700 },
+      { text: '"Not identity."',                        cls: '',   pauseAfter: 600 },
+      { text: '"Logic."',                              cls: 'hl' },
+    ],
+    action: 'begin'
+  },
+];
+
+let narrativePlayer;
+function startNarrative() {
+  showScreen('narrative-screen');
+  narrativePlayer = createBlockPlayer(
+    narrativeScript,
+    $('story-block'),
+    $('story-divider'),
+    $('continue-story-btn'),
+    $('begin-btn'),
+    showWorkedExample
+  );
+  /* panel background click → skip / advance */
+  $('narrative-panel').addEventListener('click', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    narrativePlayer.panelClick();
+  });
+  setTimeout(() => narrativePlayer.start(), 450);
+}
+
+/* ================================================================
+   PUZZLE
+================================================================ */
+let puzzleStartTime;
+function startPuzzle() {
+  puzzleStartTime = Date.now();
+  glitchTransition(() => {
+    showScreen('puzzle-screen');
+    $('attempt-badge').classList.remove('show');
+  });
+}
+
+/* hint sets per attempt */
+const hintSets = [
+  [
+    { text: 'Not quite.',                                delay: 0 },
+    { text: 'Take a closer look.',                       delay: 650 },
+    { text: 'Observe how the numbers are changing.',     delay: 1400 },
+  ],
+  [
+    { text: "You're getting there.",                     delay: 0 },
+    { text: 'Focus on how much each number increases.',  delay: 750 },
+  ],
+  [
+    { text: 'Look carefully…',                           delay: 0 },
+    { text: 'Each step increases by the same amount.',   delay: 750 },
+    { text: 'What is that amount?',                      delay: 1550 },
+  ],
+  [
+    { text: 'The pattern increases by +2 each step.',    delay: 0 },
+  ],
+];
+
+let answering = false;
+let wrongCount = 0;
+
+function checkAnswer(btn, isCorrect) {
+  if (answering) return;
+  answering = true;
+  const fb      = $('feedback-box');
+  const panel   = document.querySelector('#puzzle-screen .glass-panel');
+  const allBtns = document.querySelectorAll('#puzzle-screen .option-btn');
+
+  allBtns.forEach(b => { if (b !== btn) b.disabled = true; });
+  btn.disabled = true;
+
+  if (isCorrect) {
+    const responseTime = Date.now() - puzzleStartTime;
+    saveSignal(responseTime);
+    showGhostStats(true);
+
+    btn.classList.add('correct');
+    fb.className = 'success';
+    showHintLines(fb, [
+      { text: 'Pattern accepted.', delay: 0 },
+      { text: 'You follow rules.', delay: 650 },
+    ]);
+    setTimeout(() => showRecall(btn), 2200);
+
+  } else {
+    showGhostStats(false);
+    wrongCount++;
+    btn.classList.add('wrong');
+    panel.classList.add('shake');
+    setTimeout(() => panel.classList.remove('shake'), 400);
+    document.body.style.background = 'rgba(60,0,15,.32)';
+    setTimeout(() => document.body.style.background = '', 350);
+
+    fb.className = 'error';
+    const hints = hintSets[Math.min(wrongCount - 1, hintSets.length - 1)];
+    showHintLines(fb, hints);
+
+    $('attempt-num').textContent = wrongCount + 1;
+    $('attempt-badge').classList.add('show');
+
+    const resetAt = hints[hints.length - 1].delay + 2500;
+    setTimeout(() => {
+      answering = false;
+      allBtns.forEach(b => { b.disabled = false; b.classList.remove('wrong'); });
+      btn.classList.remove('wrong');
+      fb.innerHTML = ''; fb.className = '';
+    }, resetAt);
+  }
+}
+
+function showHintLines(container, lines) {
+  container.innerHTML = '';
+  lines.forEach(({ text, delay }) => {
+    const div = document.createElement('div');
+    div.className = 'hint-line';
+    div.textContent = text;
+    container.appendChild(div);
+    setTimeout(() => div.classList.add('show'), delay + 80);
+  });
+}
+
+/* ================================================================
+   EXPLAIN SCRIPT — 5 blocks
+================================================================ */
+const explainScript = [
+  {
+    lines: [
+      { text: '"That worked."',                    cls: '',   pauseAfter: 700 },
+      { text: '"You didn\'t guess the answer."',   cls: '',   pauseAfter: 700 },
+      { text: '"You followed a pattern."',          cls: 'hl' },
+    ]
+  },
+  {
+    lines: [
+      { text: '2 → 4 → 6 → 8',                   cls: 'cod', pauseAfter: 1000 },
+      { text: '"Each step increases by 2."',        cls: 'hl'  },
+    ]
+  },
+  {
+    lines: [
+      { text: '"This ability… to notice patterns and follow rules…"', cls: '',   pauseAfter: 800 },
+      { text: '"That\'s how coding begins."',                         cls: 'amb' },
+    ]
+  },
+  {
+    lines: [
+      { text: '"What you just did is the foundation of coding."', cls: '',   pauseAfter: 700 },
+      { text: '"Computers don\'t think randomly."',               cls: '',   pauseAfter: 700 },
+      { text: '"They follow clear, logical steps."',              cls: '',   pauseAfter: 700 },
+      { text: '"And you just did the same."',                    cls: 'hl'  },
+    ]
+  },
+  {
+    lines: [
+      { text: `"In the next level, ${getName()}..."`,                                    cls: '',   pauseAfter: 800 },
+      { text: '"You\'ll learn how to communicate with the system."',      cls: 'amb' },
+    ],
+    action: 'complete'
+  },
+];
+
+let explainPlayer;
+let explainListenerAdded = false;
+
+function startExplain() {
+  showScreen('explain-screen');
+  explainPlayer = createBlockPlayer(
+    explainScript,
+    $('explain-block'),
+    $('explain-divider'),
+    $('continue-explain-btn'),
+    null,
+    startTransfer
+  );
+  if (!explainListenerAdded) {
+    $('explain-panel').addEventListener('click', e => {
+      if (e.target.tagName === 'BUTTON') return;
+      explainPlayer.panelClick();
+    });
+    explainListenerAdded = true;
+  }
+  setTimeout(() => explainPlayer.start(), 450);
+}
+
+/* ================================================================
+   COMPLETE SCREEN — auto-plays 3 final lines then shows button
+================================================================ */
+const completeLines = [
+  { text: '"Logic detected."',     cls: 'hl',  pause: 1500 },
+  { text: `"You are not random, ${getName()}."`, cls: '',    pause: 1900 },
+  { text: '"You follow structure."',cls: '',   pause: 0    },  // last → show btn after
+];
+
+function showComplete() {
+  // Preload Level 2 in the background
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = 'level2.html';
+  document.head.appendChild(link);
+
+  localStorage.setItem('cer_level1', JSON.stringify({
+    completed: true,
+    wrongAttempts: wrongCount,
+    completedAt: Date.now()
+  }));
+
+  showScreen('complete-screen');
+  const block = $('complete-block');
+  if (!block) return;
+  block.innerHTML = ''; 
+  
+  const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+  const signal = state.levels?.[1]?.signal || 'WEAK';
+  
+  const sigContainer = document.createElement('div');
+  sigContainer.style.marginBottom = '2rem';
+  sigContainer.innerHTML = `<div style="font-size:0.7rem; color:var(--text-dim); margin-bottom:10px;">CONCEPT SIGNAL:</div>` + getSignalHTML(signal);
+  block.appendChild(sigContainer);
+
+  let i = 0;
+  function nextLine() {
+    if (i >= completeLines.length) {
+      setTimeout(() => {
+        const div = $('complete-divider');
+        const btn = $('continue-final-btn');
+        if (div) div.classList.add('show');
+        if (btn) btn.classList.add('show');
+      }, 800);
+      return;
+    }
+    const ld  = completeLines[i];
+    const el  = document.createElement('div');
+    el.className = 'bl' + (ld.cls ? ' ' + ld.cls : '');
+    el.textContent = ld.text;
+    block.appendChild(el);
+    setTimeout(() => el.classList.add('in'), 50);
+    
+    const pause = ld.pause || 1500;
+    i++;
+    setTimeout(nextLine, pause);
+  }
+  setTimeout(nextLine, 400);
+}
+
+/* ================================================================
+   CONTINUE → LEVEL 2
+================================================================ */
+function continueGame() {
+  const state = JSON.parse(
+    localStorage.getItem('cer_state') || '{}'
+  );
+  if (!state.levels) state.levels = {};
+  state.levels[1] = {
+    completed: true,
+    completedAt: Date.now(),
+    wrongAttempts: wrongCount  // already tracked in level1
+  };
+  state.currentLevel = 2;
+  localStorage.setItem('cer_state', JSON.stringify(state));
+  glitchTransition(() => {
+    window.location.href = 'level2.html';
+  });
+}
+
+/* ================================================================
+   BOOT
+================================================================ */
+window.addEventListener('load', () => {
+  // Check if identity already known
+  const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+  if (state.playerName) {
+    $('identity-screen').style.display = 'none';
+    setTimeout(runBoot, 250);
+  }
+});
+</script>
+</body>
+</html>

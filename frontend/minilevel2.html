@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AXIOM OS - Mini Challenge 2</title>
+    <style>
+        :root {
+            --bg-color: #02020a;
+            --green: #00ff88;
+            --teal: #5DCAA5;
+            --teal-dim: rgba(93, 202, 165, 0.3);
+            --font-main: 'Courier New', Courier, monospace;
+            --glow-green: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
+            --glow-teal: 0 0 10px rgba(93, 202, 165, 0.5), 0 0 20px rgba(93, 202, 165, 0.3);
+            --red: #ff4444;
+            --amber: #ffaa00;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--green);
+            font-family: var(--font-main);
+            overflow: hidden;
+        }
+
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .grid-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background-image: linear-gradient(var(--teal-dim) 1px, transparent 1px), linear-gradient(90deg, var(--teal-dim) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg) translateY(-50%) translateZ(0);
+            animation: grid-move 20s linear infinite;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        @keyframes grid-move {
+            0% { transform: perspective(500px) rotateX(60deg) translateY(-50%); }
+            100% { transform: perspective(500px) rotateX(60deg) translateY(0%); }
+        }
+
+        #progress-bar {
+            position: fixed; top: 0; left: 0; right: 0;
+            z-index: 9999;
+            display: flex; justify-content: center;
+            align-items: center; gap: 0.6rem;
+            padding: 0.4rem 1rem;
+            background: rgba(2,2,10,0.95);
+            border-bottom: 1px solid rgba(0,255,136,0.1);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.6rem; letter-spacing: 0.15em;
+        }
+
+        .screen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--bg-color);
+            z-index: 50;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+        }
+        .screen.active {
+            display: flex;
+        }
+
+        /* Intro Screen */
+        .intro-line {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            opacity: 0;
+            transition: opacity 0.8s ease-in;
+            color: var(--teal);
+        }
+        .intro-line.visible {
+            opacity: 1;
+        }
+
+        /* Puzzle UI */
+        .modal-box {
+            border: 2px solid var(--teal-dim);
+            padding: 2.5rem;
+            background: rgba(2, 2, 10, 0.85);
+            backdrop-filter: blur(4px);
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(93, 202, 165, 0.1);
+            position: relative;
+        }
+
+        .puzzle-header {
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            color: rgba(93, 202, 165, 0.5);
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+        }
+
+        .puzzle-title {
+            font-size: 1.5rem;
+            color: var(--green);
+            text-shadow: var(--glow-green);
+            margin-bottom: 1.5rem;
+            letter-spacing: 2px;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 1.5rem;
+            margin: 0 auto 2rem auto;
+            color: var(--green);
+            text-align: left;
+            border: 1px solid var(--teal-dim);
+            font-family: var(--font-main);
+            font-size: 1.3rem;
+            box-shadow: inset 0 0 15px rgba(0, 255, 136, 0.05);
+            width: 80%;
+            white-space: pre-wrap;
+        }
+
+        .code-block .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1.2rem;
+            background: var(--green);
+            vertical-align: middle;
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .puzzle-question {
+            font-size: 1.1rem;
+            color: var(--teal);
+            margin-bottom: 1.5rem;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .option-btn {
+            background: transparent;
+            border: 1px solid var(--teal-dim);
+            color: #fff;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-main);
+            font-size: 1.1rem;
+        }
+
+        .option-btn:hover:not(:disabled) {
+            border-color: var(--teal);
+            box-shadow: var(--glow-teal);
+        }
+
+        .option-btn.wrong {
+            border-color: var(--red);
+            box-shadow: 0 0 10px var(--red);
+            color: var(--red);
+        }
+
+        .option-btn.correct {
+            border-color: var(--green);
+            box-shadow: var(--glow-green);
+            color: var(--green);
+        }
+
+        .feedback-text {
+            min-height: 2.5rem;
+            font-size: 0.85rem;
+            color: var(--amber);
+            letter-spacing: 0.08em;
+        }
+
+        /* Progress Dots */
+        .progress-dots {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: var(--bg-color);
+            padding: 0 10px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1px solid var(--teal);
+            transition: all 0.3s;
+        }
+
+        .dot.active {
+            background: var(--green);
+            border-color: var(--green);
+            box-shadow: var(--glow-green);
+        }
+
+        /* Complete Screen */
+        .complete-title {
+            font-family: 'Courier New', monospace;
+            font-size: 4rem;
+            color: var(--green);
+            text-shadow: var(--glow-green);
+            margin-bottom: 1rem;
+            letter-spacing: 4px;
+        }
+
+        .complete-sub {
+            font-size: 1.2rem;
+            color: var(--teal);
+            margin-bottom: 3rem;
+            letter-spacing: 2px;
+        }
+
+        .stats-panel {
+            border: 1px dashed var(--green);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            display: inline-block;
+            text-align: left;
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .stat-line {
+            font-size: 1.2rem;
+            color: var(--green);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-val {
+            float: right;
+            margin-left: 2rem;
+        }
+
+        .narrative-end {
+            color: var(--amber);
+            font-size: 1.1rem;
+            margin-bottom: 3rem;
+            min-height: 3rem;
+        }
+
+        .neon-btn {
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            padding: 1rem 3rem;
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: var(--glow-green);
+            text-transform: uppercase;
+        }
+
+        .neon-btn:hover {
+            background: var(--green);
+            color: var(--bg-color);
+            box-shadow: 0 0 30px var(--green);
+            transform: scale(1.05);
+        }
+
+        /* ═══ FIX M2-4: HUB BUTTON ═══ */
+        .back-btn {
+          background:transparent; border:none;
+          color:rgba(0,255,136,0.35);
+          font-family:var(--font-main);
+          font-size:0.65rem; cursor:pointer;
+          letter-spacing:0.12em; margin-top:0.5rem;
+          display:block;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .back-btn:hover {
+            color: var(--teal);
+        }
+    </style>
+</head>
+<body>
+    <div id="progress-bar">
+        <span id="pb1">LVL 1</span> <span style="color:#1a3a2a">──</span>
+        <span id="pb2">LVL 2</span> <span style="color:#1a3a2a">──</span>
+        <span id="pbm2" style="color:#ffaa00; text-shadow: 0 0 8px #ffaa00">MINI 2</span> <span style="color:#1a3a2a">──</span>
+        <span id="pbm">MINI</span> <span style="color:#1a3a2a">──</span>
+        <span id="pb4">LVL 4</span>
+    </div>
+
+    <div class="scanlines"></div>
+    <div class="grid-bg"></div>
+
+    <div id="intro-screen" class="screen active">
+        <div id="intro-text"></div>
+    </div>
+
+    <div id="puzzle-screen" class="screen">
+        <div class="modal-box">
+            <div class="progress-dots" id="dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+            <div class="puzzle-header" id="puzzle-header">MINI CHALLENGE 2 // PUZZLE 1 OF 3</div>
+            <div class="puzzle-title">PREDICT THE OUTPUT</div>
+            <div class="code-block" id="code-block"></div>
+            <div class="puzzle-question">What does this output?</div>
+            <div class="options-grid" id="options-grid"></div>
+            <div class="feedback-text" id="feedback-text"></div>
+        </div>
+    </div>
+
+    <div id="complete-screen" class="screen">
+        <div class="complete-title">OUTPUT MASTERED</div>
+        <div class="complete-sub">The system's voice is clear to you now.</div>
+        
+        <div class="stats-panel">
+            <div class="stat-line">Puzzles Solved: <span class="stat-val">3 / 3</span></div>
+            <div class="stat-line">Wrong Attempts: <span class="stat-val" id="wrong-count">0</span></div>
+        </div>
+
+        <div class="narrative-end" id="narrative-end"></div>
+
+        <button class="neon-btn" onclick="proceedToLevel3()">[ PROCEED TO LEVEL 3 ▶ ]</button>
+        <button class="back-btn" onclick="window.location.href='hub.html'">
+          ↩ BACK TO HUB
+        </button>
+    </div>
+
+    <script>
+        // Init State
+        document.addEventListener('DOMContentLoaded', () => {
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            if(!state.levels) state.levels = {};
+            state.levels['mini2'] = {
+                started: true,
+                startedAt: Date.now(),
+                completed: false,
+                wrongAttempts: 0,
+                mistakes: 0
+            };
+            localStorage.setItem('cer_state', JSON.stringify(state));
+
+            // Mark completed levels
+            // ═══ FIX M2-2: PROGRESS BAR pbm2 ═══
+            const map = {
+                pb1:  state.levels?.[1]?.completed,
+                pb2:  state.levels?.[2]?.completed,
+                pbm2: state.levels?.mini2?.completed,
+                pb3:  state.levels?.[3]?.completed,
+                pbm:  state.levels?.mini?.completed,
+                pb4:  state.levels?.[4]?.completed
+            };
+            Object.entries(map).forEach(([id, done]) => {
+                if (done) {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = el.textContent + ' ✓';
+                }
+            });
+
+            setTimeout(playIntro, 1000);
+        });
+
+        // Intro Logic
+        const introLines = [
+            "the system has accepted your command.",
+            "but can you read what it says back?",
+            "output is not just text.",
+            "it is proof the machine understood you.",
+            "three tests. no second chances."
+        ];
+
+        let introIdx = 0;
+        function playIntro() {
+            const container = document.getElementById('intro-text');
+            if (introIdx < introLines.length) {
+                const line = document.createElement('div');
+                line.className = 'intro-line';
+                line.textContent = introLines[introIdx];
+                container.appendChild(line);
+                setTimeout(() => line.classList.add('visible'), 100);
+                introIdx++;
+                setTimeout(playIntro, 1400);
+            } else {
+                setTimeout(() => {
+                    document.getElementById('intro-screen').classList.remove('active');
+                    startPuzzles();
+                }, 1000);
+            }
+        }
+
+        // Puzzles Logic
+        const puzzles = [
+            {
+                code: 'print("ACCESS")',
+                options: ['A) access', 'B) ACCESS', 'C) "ACCESS"', 'D) print'],
+                correct: 1,
+                wrongReasons: [
+                    "Python preserves uppercase.<br>Output matches exactly what's in quotes.",
+                    "",
+                    "The quotes are not printed.<br>Only what's inside them appears.",
+                    "print() is the command.<br>What's inside the brackets is the output."
+                ]
+            },
+            {
+                code: 'print("hello" + " " + "world")',
+                options: ['A) hello world', 'B) "hello world"', 'C) hello+world', 'D) helloworld'],
+                correct: 0,
+                wrongReasons: [
+                    "",
+                    "No quotes in output.<br>String concatenation produces clean text.",
+                    "The + joins strings — it doesn't print.<br>The result is the joined string.",
+                    "There's a space string between them.<br>print(\"hello\" + \" \" + \"world\")<br>That space is included."
+                ]
+            },
+            {
+                code: 'x = "BREACH"\nprint(x)',
+                options: ['A) x', 'B) "BREACH"', 'C) BREACH', 'D) print(x)'],
+                correct: 2,
+                wrongReasons: [
+                    "x is a variable name, not the output.<br>print(x) outputs what x stores.",
+                    "Quotes are not printed.<br>Python shows only the value inside.",
+                    "",
+                    "That is the code, not the result.<br>The system executes it and shows the value."
+                ]
+            }
+        ];
+
+        let currentPuzzle = 0;
+
+        function startPuzzles() {
+            document.getElementById('puzzle-screen').classList.add('active');
+            loadPuzzle(currentPuzzle);
+        }
+
+        function loadPuzzle(idx) {
+            const p = puzzles[idx];
+            document.getElementById('puzzle-header').textContent = `MINI CHALLENGE 2 // PUZZLE ${idx + 1} OF 3`;
+            document.getElementById('code-block').innerHTML = p.code + '<span class="cursor"></span>';
+            
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+            
+            p.options.forEach((opt, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => selectOption(btn, i, idx);
+                grid.appendChild(btn);
+            });
+            
+            document.getElementById('feedback-text').innerHTML = '';
+        }
+
+        let feedbackTimeout;
+        let typeInterval;
+
+        function selectOption(btn, selectedIdx, puzzleIdx) {
+            const p = puzzles[puzzleIdx];
+            const grid = document.getElementById('options-grid');
+            const btns = grid.querySelectorAll('.option-btn');
+            
+            btns.forEach(b => b.disabled = true);
+            clearTimeout(feedbackTimeout);
+            clearInterval(typeInterval);
+
+            if (selectedIdx === p.correct) {
+                btn.classList.add('correct');
+                const fb = document.getElementById('feedback-text');
+                fb.style.color = 'var(--green)';
+                fb.textContent = "SIGNAL CONFIRMED.";
+                
+                document.getElementById('dots').children[puzzleIdx].classList.add('active');
+
+                setTimeout(() => {
+                    currentPuzzle++;
+                    if (currentPuzzle < puzzles.length) {
+                        loadPuzzle(currentPuzzle);
+                    } else {
+                        showCompleteScreen();
+                    }
+                }, 1200);
+            } else {
+                btn.classList.add('wrong');
+                const fb = document.getElementById('feedback-text');
+                fb.style.color = 'var(--amber)';
+                fb.innerHTML = '';
+
+                const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+                // ═══ FIX M2-5: WRONG ATTEMPT GUARD ═══
+                if (!state.levels) state.levels = {};
+                if (!state.levels.mini2) state.levels.mini2 = {
+                  wrongAttempts: 0, mistakes: 0,
+                  started: true, startedAt: Date.now()
+                };
+                state.levels.mini2.wrongAttempts =
+                  (state.levels.mini2.wrongAttempts || 0) + 1;
+                state.levels.mini2.mistakes =
+                  (state.levels.mini2.mistakes || 0) + 1;
+                localStorage.setItem('cer_state', JSON.stringify(state));
+
+                const rawText = p.wrongReasons[selectedIdx].replace(/<br>/g, '\n');
+                let charIdx = 0;
+                typeInterval = setInterval(() => {
+                    const currentText = rawText.substring(0, charIdx);
+                    fb.innerHTML = currentText.replace(/\n/g, '<br>');
+                    charIdx++;
+                    if (charIdx > rawText.length) {
+                        clearInterval(typeInterval);
+                    }
+                }, 20);
+
+                setTimeout(() => {
+                    btns.forEach(b => b.disabled = false);
+                }, 1800);
+
+                feedbackTimeout = setTimeout(() => {
+                    btn.classList.remove('wrong');
+                    fb.innerHTML = '';
+                }, 2000 + (rawText.length * 20)); // Keep visible a bit longer after typing completes
+            }
+        }
+
+        function showCompleteScreen() {
+            document.getElementById('puzzle-screen').classList.remove('active');
+            document.getElementById('complete-screen').classList.add('active');
+
+            const state = JSON.parse(localStorage.getItem('cer_state') || '{}');
+            const wrong = state.levels?.mini2?.wrongAttempts || 0;
+            
+            document.getElementById('wrong-count').textContent = wrong;
+
+            const endContainer = document.getElementById('narrative-end');
+            // ═══ FIX M2-3: PLAYER NAME ═══
+            const state2 = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+            );
+            const pName = state2.playerName || 'OPERATIVE';
+
+            if (wrong === 0) {
+                lines = [
+                    `Flawless signal interception, ${pName}.`,
+                    "You hear the machine perfectly."
+                ];
+            } else if (wrong <= 3) {
+                lines = [
+                    `A few miscalculations, ${pName}.`,
+                    "But your signal is now clean."
+                ];
+            } else {
+                lines = [
+                    `The noise confused you, ${pName}.`,
+                    "Listen more carefully next time."
+                ];
+            }
+
+            let lineIdx = 0;
+            function typeNarrative() {
+                if (lineIdx < lines.length) {
+                    const div = document.createElement('div');
+                    endContainer.appendChild(div);
+                    let i = 0;
+                    const text = lines[lineIdx];
+                    const inv = setInterval(() => {
+                        div.textContent = text.slice(0, i);
+                        i++;
+                        if(i > text.length) {
+                            clearInterval(inv);
+                            lineIdx++;
+                            setTimeout(typeNarrative, 500);
+                        }
+                    }, 30);
+                }
+            }
+            setTimeout(typeNarrative, 500);
+        }
+
+        // ═══ FIX M2-1: STATE SAVING ═══
+        function proceedToLevel3() {
+            const state = JSON.parse(
+                localStorage.getItem('cer_state') || '{}'
+            );
+            // Always initialize if missing
+            if (!state.levels) state.levels = {};
+            if (!state.levels.mini2) state.levels.mini2 = {};
+
+            // Merge existing data, mark complete
+            state.levels.mini2 = {
+                ...state.levels.mini2,
+                completed: true,
+                completedAt: Date.now(),
+                wrongAttempts: state.levels.mini2.wrongAttempts || 0,
+                mistakes: state.levels.mini2.mistakes || 0
+            };
+            state.currentLevel = 3;
+            localStorage.setItem('cer_state', JSON.stringify(state));
+            window.location.href = 'level3.html';
+        }
+    </script>
+</body>
+</html>

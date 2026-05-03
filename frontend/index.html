@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Escape Room — Language Select</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green:     #00ff88;
+            --green-dim: #00cc6a;
+            --red:       #ff3355;
+            --amber:     #ffcc44;
+            --bg:        #020812;
+            --glass:     rgba(4, 18, 44, 0.72);
+            --glass-border: rgba(0, 255, 136, 0.3);
+            --text:      #cde8d6;
+            --text-dim:  #4f8a68;
+            --font:      'Share Tech Mono', monospace;
+            --font-vt:   'VT323', monospace;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            width: 100%; height: 100%;
+            background: var(--bg);
+            color: var(--green);
+            font-family: var(--font);
+            overflow-x: hidden;
+            overflow-y: auto;
+            user-select: none;
+        }
+
+        /* ======== SCANLINES ======== */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px, transparent 3px,
+                rgba(0,0,0,0.14) 3px, rgba(0,0,0,0.14) 4px
+            );
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        /* ======== GRID BG ======== */
+        .grid-bg {
+            position: fixed; inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+            background-size: 44px 44px;
+            z-index: -1;
+            animation: gridPulse 8s ease-in-out infinite;
+        }
+        @keyframes gridPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+        /* ======== PARTICLES ======== */
+        #particles { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+        .particle {
+            position: absolute; width: 2px; height: 2px;
+            background: var(--green); border-radius: 50%;
+            animation: floatUp linear infinite; opacity: 0;
+        }
+        @keyframes floatUp {
+            0%   { transform: translateY(100vh) scale(0); opacity: 0; }
+            10%  { opacity: .5; }
+            90%  { opacity: .1; }
+            100% { transform: translateY(-10px) scale(1.2); opacity: 0; }
+        }
+
+        /* ======== HUB CONTENT ======== */
+        #app {
+            position: relative; z-index: 10;
+            max-width: 1200px; margin: 0 auto;
+            padding: 6rem 2rem 8rem;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        header { text-align: center; margin-bottom: 4rem; }
+        h1 {
+            font-family: var(--font-vt);
+            font-size: clamp(3rem, 8vw, 5.5rem);
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 25px var(--green);
+            margin-bottom: 0.2rem;
+            line-height: 1;
+        }
+        .subtitle {
+            font-size: 1.1rem; letter-spacing: 0.4em;
+            color: var(--green-dim); text-transform: uppercase;
+            margin-bottom: 2rem;
+            animation: flicker 3s infinite alternate;
+        }
+        @keyframes flicker {
+            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+            20%, 24%, 55% { opacity: 0.5; }
+            22% { opacity: 0.1; }
+        }
+
+        /* ======== LEVEL GRID ======== */
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 2rem; width: 100%; max-width: 1000px;
+        }
+
+        .level-card {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 2rem;
+            backdrop-filter: blur(14px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            display: flex; flex-direction: column;
+            min-height: 240px;
+            overflow: hidden;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+        }
+        .level-card::before {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(circle at center, rgba(0,255,136,0.05), transparent);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .level-card.locked { opacity: 0.3; filter: grayscale(1); pointer-events: none; }
+        .level-card:not(.locked) {
+            border-color: rgba(0, 255, 136, 0.6);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
+        }
+        .level-card:not(.locked):hover {
+            border-color: var(--green);
+            box-shadow: 0 0 30px rgba(0,255,136,0.2), inset 0 0 15px rgba(0,255,136,0.05);
+            transform: translateY(-8px);
+        }
+        .level-card:not(.locked):hover::before { opacity: 1; }
+
+        .lang-icon {
+            font-size: 3rem; margin-bottom: 1rem;
+            font-family: var(--font-vt);
+            color: var(--green);
+            text-shadow: 0 0 10px rgba(0,255,136,0.4);
+        }
+        .lang-name {
+            font-family: var(--font-vt);
+            font-size: 2.2rem; margin-bottom: 0.3rem;
+            letter-spacing: 0.1em; color: var(--green);
+            text-shadow: 0 0 10px rgba(0,255,136,0.4);
+        }
+        .card-divider {
+            width: 100%; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--green-dim), transparent);
+            margin: 1.2rem 0; opacity: 0.4;
+        }
+
+        .enter-btn {
+            margin-top: auto;
+            padding: 0.75rem 2rem;
+            border: 1px solid var(--green);
+            background: transparent;
+            color: var(--green);
+            font-family: var(--font);
+            font-size: 0.9rem;
+            letter-spacing: 0.25em;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            text-decoration: none;
+            position: relative; z-index: 2;
+            width: 100%;
+        }
+        .enter-btn:hover { 
+            background: var(--green); 
+            color: var(--bg); 
+            box-shadow: 0 0 20px var(--green);
+        }
+
+        .status-coming-soon {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-top: auto;
+            border-top: 1px dashed rgba(0, 255, 136, 0.2);
+            padding-top: 1rem;
+            width: 100%;
+        }
+
+        /* ======== STATUS BAR ======== */
+        #status-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.7rem 2rem;
+            font-size: 0.65rem; color: var(--text-dim);
+            letter-spacing: 0.2em;
+            border-top: 1px solid rgba(0,255,136,0.12);
+            background: rgba(2,8,18,0.95);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+        }
+        #blink-cursor {
+            display: inline-block; width: 8px; height: 13px;
+            background: var(--green); vertical-align: middle; margin-left: 5px;
+            animation: blinkCaret 0.8s step-end infinite;
+        }
+        @keyframes blinkCaret { 50% { opacity: 0; } }
+
+        /* ======== GLITCH TRANSITION ======== */
+        #glitch-overlay {
+            position: fixed; inset: 0; z-index: 10000;
+            pointer-events: none; display: none;
+        }
+        #glitch-overlay.active { display: block; }
+        .glitch-bar { position: absolute; width: 100%; opacity: 0; }
+
+        @keyframes glitchBar {
+          0%   { transform:scaleX(0) translateX(-30px); opacity:1; }
+          40%  { transform:scaleX(1.2) translateX(8px);  opacity:.85; }
+          70%  { transform:scaleX(.5) translateX(-12px);  opacity:.5; }
+          100% { transform:scaleX(0) translateX(18px);  opacity:0; }
+        }
+
+        @media (max-width: 600px) {
+            .level-grid { grid-template-columns: 1fr; }
+            h1 { font-size: 2.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="grid-bg"></div>
+    <div id="particles"></div>
+    <div id="glitch-overlay"></div>
+
+    <div id="app">
+        <header>
+            <h1>SYS://INIT_ENVIRONMENT</h1>
+            <div class="subtitle">SELECT PRIMARY COMPILER</div>
+        </header>
+
+        <div class="level-grid" id="language-grid">
+            <!-- Active Option -->
+            <div class="level-card">
+                <div class="lang-icon">{ }</div>
+                <div class="lang-name">PYTHON</div>
+                <div class="card-divider"></div>
+                <button class="enter-btn" onclick="selectLanguage('python')">CONNECT →</button>
+            </div>
+
+            <!-- Locked Options -->
+            <div class="level-card locked">
+                <div class="lang-icon">++</div>
+                <div class="lang-name">C++</div>
+                <div class="card-divider"></div>
+                <div class="status-coming-soon">STATUS: COMING SOON</div>
+            </div>
+
+            <div class="level-card locked">
+                <div class="lang-icon">☕</div>
+                <div class="lang-name">JAVA</div>
+                <div class="card-divider"></div>
+                <div class="status-coming-soon">STATUS: COMING SOON</div>
+            </div>
+
+            <div class="level-card locked">
+                <div class="lang-icon">GO</div>
+                <div class="lang-name">GO</div>
+                <div class="card-divider"></div>
+                <div class="status-coming-soon">STATUS: COMING SOON</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="status-bar">
+        <span>SYS://ESCAPE_PROTOCOL/INIT</span>
+        <span id="status-clock">00:00:00</span>
+        <span>LANG_SELECT v1.0<span id="blink-cursor"></span></span>
+    </div>
+
+    <script>
+        function selectLanguage(lang) {
+            localStorage.setItem('cer_selected_lang', lang);
+            glitchTransition(() => {
+                window.location.href = 'hub.html'; // Redirects to your mission hub
+            });
+        }
+
+        function glitchTransition(cb) {
+            const ov = document.getElementById('glitch-overlay');
+            ov.innerHTML = ''; ov.classList.add('active');
+            
+            for (let i = 0; i < 18; i++) {
+                const b = document.createElement('div');
+                b.className = 'glitch-bar';
+                b.style.cssText = `
+                    top: ${Math.random() * 100}vh;
+                    height: ${1 + Math.random() * 8}px;
+                    background: ${Math.random() > 0.5 ? 'var(--green)' : '#00ccff'};
+                    animation: glitchBar ${60 + Math.random() * 100}ms ${Math.random() * 200}ms ease both;
+                `;
+                ov.appendChild(b);
+            }
+
+            setTimeout(() => {
+                ov.classList.remove('active');
+                if (cb) cb();
+            }, 380);
+        }
+
+        function updateClock() {
+            const n = new Date();
+            const pad = (v) => String(v).padStart(2, '0');
+            document.getElementById('status-clock').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+        }
+
+        function initParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 35; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                p.style.left = Math.random() * 100 + 'vw';
+                p.style.animationDuration = (6 + Math.random() * 12) + 's';
+                p.style.animationDelay = (Math.random() * 6) + 's';
+                p.style.width = p.style.height = (Math.random() > 0.5 ? 2 : 3) + 'px';
+                container.appendChild(p);
+            }
+        }
+
+        window.onload = () => {
+            updateClock();
+            setInterval(updateClock, 1000);
+            initParticles();
+        };
+    </script>
+</body>
+</html>
