@@ -11,6 +11,9 @@ export default function MissionHubPage() {
   const navigate = useNavigate()
   const selectedLanguage = useEscapeStore((state) => state.selectedLanguage)
   const levels = useEscapeStore((state) => state.levels)
+  const unlockedLevels = useEscapeStore((state) => state.unlockedLevels ?? [1])
+  const totalXp = useEscapeStore((state) => state.totalXp ?? 0)
+  const totalAttempts = useEscapeStore((state) => state.totalAttempts ?? 0)
   const markLevelStarted = useEscapeStore((state) => state.markLevelStarted)
 
   const completedCount = LEVELS.filter((level) => levels[level.id]?.completed).length
@@ -48,12 +51,17 @@ export default function MissionHubPage() {
               style={{ width: `${(completedCount / LEVEL_COUNT) * 100}%` }}
             />
           </div>
+          <div className="mt-4 grid gap-2 text-center text-xs uppercase tracking-[0.2em] text-ghost sm:grid-cols-3">
+            <div>Total XP: <span className="text-neon">{totalXp}</span></div>
+            <div>Unlocked: <span className="text-neon">{unlockedLevels.length}</span></div>
+            <div>Attempts: <span className="text-neon">{totalAttempts}</span></div>
+          </div>
         </GlassPanel>
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {LEVELS.map((level, index) => {
             const levelState = levels[level.id]
-            const isUnlocked = level.id === 1 || levels[level.id - 1]?.completed
+            const isUnlocked = unlockedLevels.includes(level.id)
             const isCompleted = levelState?.completed
             const isInProgress = levelState?.started && !isCompleted
 
@@ -76,7 +84,11 @@ export default function MissionHubPage() {
                   <div className="font-display text-4xl tracking-[0.12em] text-neon">{level.code}</div>
                   <div className="mt-2 text-lg text-mist">{level.name}</div>
                   <div className="my-5 h-px bg-gradient-to-r from-neon-dim/70 to-transparent" />
-                  <div className="mt-auto text-[0.72rem] uppercase tracking-[0.2em] text-ghost">Skill // {level.skill}</div>
+                  <div className="mt-auto space-y-1 text-[0.72rem] uppercase tracking-[0.2em] text-ghost">
+                    <div>Skill // {level.skill}</div>
+                    <div>Concept // {level.concept}</div>
+                    <div>XP // {level.xpReward}</div>
+                  </div>
 
                   <div className="mt-6 flex min-h-[3rem] flex-col justify-end gap-2">
                     {isCompleted && (
@@ -103,7 +115,7 @@ export default function MissionHubPage() {
                           : 'cursor-not-allowed border-neon/10 text-ghost',
                       ].join(' ')}
                     >
-                      {isCompleted ? 'Re-enter ->' : isInProgress ? 'Resume ->' : isUnlocked ? 'Enter ->' : 'Locked'}
+                      {isCompleted ? 'Re-enter' : isInProgress ? 'Resume' : isUnlocked ? 'Enter' : 'Locked'}
                       {isUnlocked && <ArrowRight className="ml-2 h-4 w-4" />}
                     </button>
                   </div>

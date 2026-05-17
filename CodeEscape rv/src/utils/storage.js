@@ -11,6 +11,8 @@ const createLevelRecord = () => ({
   timeSpent: 0,
   completedAt: null,
   started: false,
+  attempts: 0,
+  xpEarned: 0,
 })
 
 export const createDefaultState = () => {
@@ -27,6 +29,9 @@ export const createDefaultState = () => {
     levels,
     totalWrongAttempts: 0,
     totalTimeSpent: 0,
+    totalAttempts: 0,
+    totalXp: 0,
+    unlockedLevels: [1],
     playerName: 'OPERATIVE',
   }
 }

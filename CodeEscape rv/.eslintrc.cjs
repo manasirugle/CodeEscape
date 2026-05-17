@@ -11,6 +11,12 @@ module.exports = {
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
   settings: { react: { version: '18.2' } },
   plugins: ['react-refresh'],
+  overrides: [
+    {
+      files: ['server/**/*.js'],
+      env: { node: true, browser: false, es2020: true },
+    },
+  ],
   rules: {
     'react/prop-types': 'off',
     'react/no-unknown-property': ['error', { ignore: ['args', 'attach', 'array', 'blending', 'count', 'intensity', 'itemSize', 'position', 'rotation', 'sizeAttenuation', 'transparent', 'wireframe'] }],
