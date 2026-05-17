@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react'
+import { Lock, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 
@@ -65,8 +65,9 @@ export default function LanguageSelectPage() {
                         {isSelected ? 'Handshake primed' : 'Signal detected'}
                       </div>
                       <NeonButton className="w-full" onClick={() => handleSelect(language.id)}>
-                        {isSelected ? 'Reconnect ->' : 'Connect ->'}
-                      </NeonButton>
+                        {isSelected ? 'Reconnect ' : 'Connect '}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </NeonButton> 
                     </>
                   ) : (
                     <div className="mt-4 flex items-center gap-2 text-[0.68rem] uppercase tracking-[0.22em] text-ghost">
