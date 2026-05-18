@@ -1,35 +1,57 @@
 const level1 = {
   id: 1,
-  title: 'Hello World',
-  concept: 'Output',
+  title: 'Pattern Recognition',
+  concept: 'Signal Pattern Analysis',
   difficulty: 'Beginner',
+  mode: 'synchronization',
   learningObjectives: [
-    'Understand how print() displays text',
-    'Run your first Python program',
+    'Recognize repeating logical structures',
+    'Detect sequence anomalies',
+    'Build confidence in computational thinking',
   ],
-  narrative: 'Bring the terminal online by sending the first readable signal.',
-  instructions:
-    'Write Python code that prints exactly Hello, World! to the output console.',
-  starterCode: `# Print the required message below
-print("")
-`,
-  expectedOutput: 'Hello, World!',
-  validationType: 'output',
-  testCases: [
+  narrative:
+    'Synchronization chamber initialized. Complete neural pattern calibration to unlock terminal access.',
+  bootSequence: [
+    'Synchronization request detected...',
+    'Cognitive pattern analysis initialized...',
+    'Signal lattice integrity: stable.',
+    'Identify corrupted nodes to complete calibration.',
+  ],
+  patternTasks: [
     {
-      input: '',
-      expectedOutput: 'Hello, World!',
-      explanation: 'Output should match exactly, including punctuation.',
+      id: 'seq-1',
+      prompt: '2 -> 4 -> 6 -> ?',
+      answer: '8',
+      success: 'Sequence aligned. Increment pattern confirmed.',
+      failure: 'Signal drift detected. The sequence rises by a fixed step.',
+    },
+    {
+      id: 'seq-2',
+      prompt: 'A -> C -> E -> ?',
+      answer: 'G',
+      success: 'Alphabetic jump chain restored.',
+      failure: 'Corrupted alphabet stride. Move two letters forward.',
+    },
+    {
+      id: 'seq-3',
+      prompt: '1010 -> 1001 -> ?',
+      answer: '1000',
+      success: 'Binary node synchronized.',
+      failure: 'Binary decay pattern unresolved. Track the final bit shift.',
     },
   ],
+  instructions: 'Complete synchronization tasks to unlock terminal access.',
+  starterCode: '',
+  expectedOutput: 'Synchronization complete',
+  validationType: 'output',
+  testCases: [],
   hints: [
-    'Use the print() function.',
-    'Text output should be inside quotes.',
-    'Try: print("Hello, World!")',
+    'Look for the rule, not just the next symbol.',
+    'Check how much each step changes.',
+    'Stability comes from consistent progression.',
   ],
   xpReward: 120,
   unlocks: [2],
 }
 
 export default level1
-

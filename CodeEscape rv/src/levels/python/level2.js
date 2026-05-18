@@ -1,36 +1,59 @@
 const level2 = {
   id: 2,
-  title: 'Variables',
-  concept: 'Variables',
+  title: 'Signal Output',
+  concept: 'print() Output Transmission',
   difficulty: 'Beginner',
+  mode: 'coding',
   learningObjectives: [
-    'Store text in a variable',
-    'Print a variable value',
+    'Understand how print() sends readable output',
+    'Predict terminal output from simple statements',
+    'Transmit your first verified message',
   ],
-  narrative: 'Stabilize memory nodes by assigning a secure codename.',
-  instructions:
-    'Create a variable named codename with value "Nova" and print it.',
-  starterCode: `# Create and print the codename variable
-codename = ""
-print(codename)
+  narrative:
+    'The terminal channel is open. Learn to transmit readable signals through output commands.',
+  bootSequence: [
+    'Signal relay online...',
+    'Transmission protocol loaded: print()',
+    'Readable output training chamber unlocked.',
+  ],
+  guidedOutputExamples: [
+    {
+      prompt: 'Predict output:\nprint("Code")\nprint("Escape")',
+      answer: 'Code\nEscape',
+      explanation: 'Each print() call writes on a new line.',
+    },
+    {
+      prompt: 'Predict output:\nprint("Signal " + "Ready")',
+      answer: 'Signal Ready',
+      explanation: 'String fragments merge before display.',
+    },
+  ],
+  instructions: 'Send the first readable signal: print exactly Hello, World!',
+  starterCode: `# Send the first readable signal
+print("")
 `,
-  expectedOutput: 'Nova',
+  expectedOutput: 'Hello, World!',
   validationType: 'output',
   testCases: [
     {
       input: '',
-      expectedOutput: 'Nova',
-      explanation: 'Print should display the variable value.',
+      expectedOutput: 'Hello, World!',
+      explanation: 'Transmit the exact phrase, including comma and exclamation mark.',
     },
   ],
+  debuggingChallenge: {
+    instructions: 'Repair the broken transmission command.',
+    brokenCode: 'print("Hello, World!)\n',
+    validationType: 'output',
+    testCases: [{ input: '', expectedOutput: 'Hello, World!', explanation: 'Close the quote and preserve punctuation.' }],
+  },
   hints: [
-    'Use codename = "Nova" to store the value.',
-    'Use print(codename) to show it.',
-    'Your final output should be Nova.',
+    'The terminal only understands readable output.',
+    'Wrap the signal text inside quotation marks.',
+    'Use transmission protocol: print("Hello, World!")',
   ],
   xpReward: 150,
   unlocks: [3],
 }
 
 export default level2
-
