@@ -96,6 +96,8 @@ export function LevelRuntime({ level }) {
   const [guidedInput, setGuidedInput] = useState('')
   const [guidedFeedback, setGuidedFeedback] = useState('')
   const [guidedDone, setGuidedDone] = useState(false)
+  const [level2IntroStep, setLevel2IntroStep] = useState(0)
+  const [showTransmissionPulse, setShowTransmissionPulse] = useState(false)
 
   const [debugCode, setDebugCode] = useState(level.debuggingChallenge?.brokenCode ?? '')
   const [debugExecution, setDebugExecution] = useState(null)
@@ -119,6 +121,8 @@ export function LevelRuntime({ level }) {
     setGuidedInput('')
     setGuidedFeedback('')
     setGuidedDone(false)
+    setLevel2IntroStep(0)
+    setShowTransmissionPulse(false)
     setDebugCode(level.debuggingChallenge?.brokenCode ?? '')
     setDebugExecution(null)
     setDebugValidation(null)
@@ -133,7 +137,10 @@ export function LevelRuntime({ level }) {
       setAttemptWrong((prev) => prev + 1)
       return
     }
-    if (isLevel2) setPhaseIndex(3)
+    if (isLevel2) {
+      setShowTransmissionPulse(true)
+      return
+    }
   }, [isLevel2, session])
 
   const runDebugPhase = useCallback(async () => {
@@ -394,12 +401,33 @@ export function LevelRuntime({ level }) {
       {phaseIndex === 0 ? (
         <GlassPanel className="px-5 py-5">
           <div className="mb-2 text-xs uppercase tracking-[0.2em] text-ghost">Signal Theory Briefing</div>
-          <TypewriterFeed lines={level.bootSequence || []} speed={18} />
-          <div className="mt-4 rounded-md border border-neon/10 bg-black/25 px-4 py-3 text-sm leading-7 text-mist/80">
-            The `print()` protocol transmits readable text into the terminal output channel.
-          </div>
-          <NeonButton className="mt-4" onClick={() => setPhaseIndex(1)}>
-            Begin Output Prediction
+          {level2IntroStep === 0 ? <TypewriterFeed lines={level.bootSequence || []} speed={18} /> : null}
+          {level2IntroStep === 1 ? (
+            <div className="rounded-md border border-neon/10 bg-black/25 px-4 py-4">
+              <div className="font-mono text-sm text-ghost">{level.demonstration?.emptyTerminalLine}</div>
+              <div className="mt-3 text-xs uppercase tracking-[0.15em] text-ghost">Attempting unsent transmission...</div>
+              <div className="mt-2 font-mono text-sm text-ember">{level.demonstration?.failedTransmissionLine}</div>
+            </div>
+          ) : null}
+          {level2IntroStep === 2 ? (
+            <div className="space-y-3">
+              <div className="rounded-md border border-neon/10 bg-black/25 px-4 py-3 text-sm leading-7 text-mist/80">
+                {level.demonstration?.explanationLine}
+              </div>
+              <div className="rounded-md border border-neon/15 bg-black/25 px-4 py-3 font-mono text-sm text-neon/90">
+                {level.demonstration?.visualCode}
+              </div>
+              <TypewriterFeed lines={[level.demonstration?.visualOutput || '']} speed={30} />
+            </div>
+          ) : null}
+          <NeonButton
+            className="mt-4"
+            onClick={() => {
+              if (level2IntroStep >= 2) setPhaseIndex(1)
+              else setLevel2IntroStep((prev) => prev + 1)
+            }}
+          >
+            {level2IntroStep >= 2 ? 'Begin Output Prediction' : 'Continue Briefing'}
           </NeonButton>
         </GlassPanel>
       ) : null}
@@ -407,16 +435,22 @@ export function LevelRuntime({ level }) {
       {phaseIndex === 1 ? (
         <GlassPanel className="px-5 py-5">
           <div className="mb-2 text-xs uppercase tracking-[0.2em] text-ghost">Output Prediction</div>
-          <pre className="rounded-md border border-neon/10 bg-black/25 px-4 py-3 font-mono text-sm text-neon/90">
-            {activeOutputTask?.prompt}
-          </pre>
-          <textarea
-            value={guidedInput}
-            onChange={(event) => setGuidedInput(event.target.value)}
-            rows={3}
-            className="mt-4 w-full border border-neon/20 bg-black/30 px-3 py-2 text-sm text-mist outline-none focus:border-neon"
-            placeholder="Predict terminal output..."
-          />
+          <pre className="rounded-md border border-neon/10 bg-black/25 px-4 py-3 font-mono text-sm text-neon/90">{activeOutputTask?.prompt}</pre>
+          <div className="mt-4 grid gap-2">
+            {(activeOutputTask?.options || []).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setGuidedInput(option)}
+                className={[
+                  'border px-3 py-2 text-left text-sm transition',
+                  guidedInput === option ? 'border-neon bg-neon/10 text-neon' : 'border-neon/20 text-mist/85 hover:border-neon/60',
+                ].join(' ')}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
           {guidedFeedback ? <div className="mt-3 text-sm text-neon">{guidedFeedback}</div> : null}
           <NeonButton className="mt-4" onClick={submitGuided}>
             Validate Prediction
@@ -425,15 +459,33 @@ export function LevelRuntime({ level }) {
       ) : null}
 
       {phaseIndex === 2 ? (
-        <CodingChallengePanel
-          instructions={level.instructions}
-          code={session.code}
-          onCodeChange={session.setCode}
-          onRun={runCodingPhase}
-          onReset={session.resetCode}
-          isRunning={session.isRunning}
-          output={codingConsoleOutput}
-        />
+        <>
+          <CodingChallengePanel
+            instructions={level.instructions}
+            code={session.code}
+            onCodeChange={session.setCode}
+            onRun={runCodingPhase}
+            onReset={session.resetCode}
+            isRunning={session.isRunning}
+            output={codingConsoleOutput}
+          />
+          {showTransmissionPulse ? (
+            <GlassPanel className="px-5 py-5">
+              <div className="text-xs uppercase tracking-[0.2em] text-neon">Transmission Stabilization</div>
+              <TypewriterFeed
+                lines={[
+                  'Readable signal received.',
+                  'Terminal channel stabilized.',
+                  'Hello, World! transmission verified.',
+                ]}
+                speed={18}
+              />
+              <NeonButton className="mt-4" onClick={() => setPhaseIndex(3)}>
+                Continue To Signal Repair
+              </NeonButton>
+            </GlassPanel>
+          ) : null}
+        </>
       ) : null}
 
       {phaseIndex === 3 ? (
