@@ -32,11 +32,11 @@ const level2 = {
       explanation: 'print() displays the text inside quotes, without the quote symbols.',
     },
     {
-      prompt: 'Which output appears after running: print("Signal " + "Ready")?',
+      prompt: 'Which output appears after running: print("Signal Ready")?',
       type: 'mcq',
-      options: ['Signal Ready', 'Signal + Ready', 'No output'],
+      options: ['Signal Ready', '"Signal Ready"', 'No output'],
       answer: 'Signal Ready',
-      explanation: 'String fragments merge before display.',
+      explanation: 'print() displays the readable text stored inside quotation marks.',
     },
     {
       prompt: 'What is missing in this command?\nprint(Hello, World!)',
